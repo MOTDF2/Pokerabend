@@ -129,7 +129,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.2';
+const APP_VERSION = '1.3';
 const BACKUP_DAYS = 14;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -589,29 +589,16 @@ function statsHtml(g) {
   });
   h += `</table></div><div class="note">Siegquote = Anteil Abende im Plus. Streuung = Standardabweichung des Nettos pro Abend (CHF). Serie = aktuelle Plus- bzw. Minusserie.</div>`;
 
-  const A = X.arr, qa = q => q.allinWins / q.allins;
-  let t = '';
-  t += titleRow('🦈', 'Haifisch (höchste Bilanz)', best(A.filter(q => q.total > 0), q => q.total, 1), q => sgn(q.total));
-  t += titleRow('🏆', 'Meiste Abende im Plus', best(A.filter(q => q.wins > 0), q => q.wins, 1), q => q.wins + '×');
-  t += titleRow('🏧', 'Bankautomat (Rebuys/Abend)', best(A.filter(q => q.rebuys > 0), q => q.rebuys / q.nights, 1), q => (Math.round(q.rebuys / q.nights * 10) / 10).toLocaleString('de-CH'));
-  t += titleRow('💥', 'Kamikaze (All-ins/Abend)', best(A.filter(q => q.allins > 0), q => q.allins / q.nights, 1), q => (Math.round(q.allins / q.nights * 10) / 10).toLocaleString('de-CH'));
-  const a5 = A.filter(q => q.allins >= 5);
-  const lk = best(a5, qa, 1), ul = best(a5, qa, -1);
-  t += titleRow('🍀', 'Glückspilz (ab 5 All-ins)', lk, q => pct(q.allinWins, q.allins));
-  if (lk.length && ul.length && qa(ul[0]) < qa(lk[0])) t += titleRow('🌧️', 'Pechvogel (ab 5 All-ins)', ul, q => pct(q.allinWins, q.allins));
-  t += titleRow('🎯', 'Knockout-König', best(A.filter(q => q.ko > 0), q => q.ko, 1), q => q.ko + ' KOs');
-  t += titleRow('🧊', 'Mr. Konstant (ab 3 Abenden)', best(A.filter(q => q.sd != null && q.nights >= 3), q => q.sd, -1), q => '± ' + NF.format(q.sd / 100));
+  const A = X.arr;
+  const t = groupTitlesData(X).map(x => `<div class="li"><span class="ico">${x.icon}</span><span class="grow"><b>${esc(x.name)}</b><div class="mu">${esc(x.who)}</div></span><span class="num">${x.val}</span></div>`).join('');
   if (t) h += `<h3>Titel (alle Abende)</h3><div class="card list">${t}</div>`;
 
   const hasDuels = Object.keys(X.beats).length > 0;
   if (hasDuels) {
     h += `<h3>Duelle (All-ins mit Gegner)</h3><div class="card tw"><table><tr><th>Spieler</th><th>Knockouts</th><th>Nemesis</th><th>Lieblingsopfer</th></tr>`;
     A.forEach(q => {
-      const lostTo = A.filter(o => o.id !== q.id && ((X.beats[o.id] || {})[q.id] || 0) > 0);
-      const nem = best(lostTo, o => X.beats[o.id][q.id], 1);
-      const wonVs = A.filter(o => o.id !== q.id && ((X.beats[q.id] || {})[o.id] || 0) > 0);
-      const vic = best(wonVs, o => X.beats[q.id][o.id], 1);
-      h += `<tr><td>${esc(mName(q.id))}</td><td>${q.ko}</td><td>${nem.length ? esc(nem.map(o => mName(o.id)).join(', ')) + ` (${X.beats[nem[0].id][q.id]})` : '–'}</td><td>${vic.length ? esc(vic.map(o => mName(o.id)).join(', ')) + ` (${X.beats[q.id][vic[0].id]})` : '–'}</td></tr>`;
+      const x = duelData(X, q);
+      h += `<tr><td>${esc(mName(q.id))}</td><td>${q.ko}</td><td>${esc(x.nem)}</td><td>${esc(x.vic)}</td></tr>`;
     });
     h += `</table></div>`;
     h += `<h3>Direktduelle: Zeile schlägt Spalte</h3><div class="card tw"><table><tr><th></th>${A.map(o => `<th>${esc(mName(o.id))}</th>`).join('')}</tr>`;
@@ -623,6 +610,32 @@ function statsHtml(g) {
     h += `<div class="note">Duell-Statistiken (Nemesis, Knockouts) erscheinen, sobald bei All-ins ein Gegner erfasst wird.</div>`;
   }
   return h;
+}
+
+function groupTitlesData(X) {
+  const A = X.arr, qa = q => q.allinWins / q.allins, r1 = v => (Math.round(v * 10) / 10).toLocaleString('de-CH');
+  const a5 = A.filter(q => q.allins >= 5);
+  const lk = best(a5, qa, 1), ul = best(a5, qa, -1);
+  const r = [
+    titleData('🦈', 'Haifisch (höchste Bilanz)', best(A.filter(q => q.total > 0), q => q.total, 1), q => sgn(q.total)),
+    titleData('🏆', 'Meiste Abende im Plus', best(A.filter(q => q.wins > 0), q => q.wins, 1), q => q.wins + '×'),
+    titleData('🏧', 'Bankautomat (Rebuys/Abend)', best(A.filter(q => q.rebuys > 0), q => q.rebuys / q.nights, 1), q => r1(q.rebuys / q.nights)),
+    titleData('💥', 'Kamikaze (All-ins/Abend)', best(A.filter(q => q.allins > 0), q => q.allins / q.nights, 1), q => r1(q.allins / q.nights)),
+    titleData('🍀', 'Glückspilz (ab 5 All-ins)', lk, q => pct(q.allinWins, q.allins))
+  ];
+  if (lk.length && ul.length && qa(ul[0]) < qa(lk[0])) r.push(titleData('🌧️', 'Pechvogel (ab 5 All-ins)', ul, q => pct(q.allinWins, q.allins)));
+  r.push(titleData('🎯', 'Knockout-König', best(A.filter(q => q.ko > 0), q => q.ko, 1), q => q.ko + ' KOs'));
+  r.push(titleData('🧊', 'Mr. Konstant (ab 3 Abenden)', best(A.filter(q => q.sd != null && q.nights >= 3), q => q.sd, -1), q => '± ' + NF.format(q.sd / 100)));
+  return r.filter(Boolean);
+}
+function duelData(X, q) {
+  const A = X.arr;
+  const nem = best(A.filter(o => o.id !== q.id && ((X.beats[o.id] || {})[q.id] || 0) > 0), o => X.beats[o.id][q.id], 1);
+  const vic = best(A.filter(o => o.id !== q.id && ((X.beats[q.id] || {})[o.id] || 0) > 0), o => X.beats[q.id][o.id], 1);
+  return {
+    nem: nem.length ? nem.map(o => mName(o.id)).join(', ') + ` (${X.beats[nem[0].id][q.id]})` : '–',
+    vic: vic.length ? vic.map(o => mName(o.id)).join(', ') + ` (${X.beats[q.id][vic[0].id]})` : '–'
+  };
 }
 
 function lineChart(X) {
@@ -691,6 +704,7 @@ class PdfDoc {
   text(x, y, s, o) { this.cur.push(this.op(x, y, s, o)); }
   line(x1, x2, y, g = 0.85) { this.cur.push(`${g} G 0.6 w ${x1} ${y.toFixed(2)} m ${x2} ${y.toFixed(2)} l S`); }
   need(h) { if (this.y - h < 60) this.newPage(); }
+  rect(x, y, w, h, col) { this.cur.push(`${col.map(n => n.toFixed(3)).join(' ')} rg ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`); }
   heading(t) { this.need(50); this.y -= 14; this.text(50, this.y, t.toUpperCase(), { size: 9, bold: true, color: C_MU }); this.y -= 16; }
   table(cols, rows) {
     const L = 50, W = cols.reduce((a, c) => a + c.w, 0);
@@ -734,6 +748,63 @@ class PdfDoc {
     return b;
   }
 }
+function groupPdfSection(d, g) {
+  const X = groupStats(g);
+  if (!X.ss.length) return;
+  const nc = v => v > 0 ? C_POS : v < 0 ? C_NEG : C_TX;
+  const r1 = v => (Math.round(v * 10) / 10).toLocaleString('de-CH');
+  d.newPage();
+  d.rect(0, 801.89, 595.28, 40, [0.078, 0.325, 0.176]);
+  d.text(50, 816, `Gruppenstatistik ${g.name}: alle Abende`, { size: 15, bold: true, color: [1, 1, 1] });
+  d.y = 775;
+  const first = X.ss[0].start, last = X.ss[X.ss.length - 1].start;
+  [['Abende', `${X.ss.length} (${new Date(first).toLocaleDateString('de-CH')} – ${new Date(last).toLocaleDateString('de-CH')})`],
+   ['Ø Dauer', X.durAvg == null ? '-' : fDur(X.durAvg)], ['Ø Spieler', r1(X.plAvg)], ['Ø Pot', chf(X.potAvg)]]
+    .forEach(([k, v]) => { d.text(50, d.y, k, { size: 10, color: C_MU }); d.text(130, d.y, v, { size: 10, bold: true }); d.y -= 15; });
+
+  d.heading('Gesamtbilanz (CHF)');
+  const mx = Math.max(1, ...X.arr.map(q => Math.abs(q.total)));
+  const mid = 320, half = 130;
+  X.arr.forEach(q => {
+    d.need(16);
+    d.text(54, d.y, mName(q.id), { size: 9.5 });
+    const w = Math.abs(q.total) / mx * half;
+    if (w > 0) d.rect(q.total >= 0 ? mid : mid - w, d.y - 2, w, 9, q.total >= 0 ? C_POS : C_NEG);
+    d.text(545, d.y, sgn(q.total), { size: 9.5, bold: true, color: nc(q.total), align: 'right' });
+    d.y -= 16;
+  });
+  d.cur.push(`0.6 G 0.6 w ${mid} ${(d.y + 12).toFixed(2)} m ${mid} ${(d.y + 16 * X.arr.length + 12).toFixed(2)} l S`);
+
+  d.heading('Rangliste');
+  d.table([{ h: 'Spieler', w: 115 }, { h: 'Abende', w: 45 }, { h: 'Bilanz', w: 62 }, { h: 'Ø/Abend', w: 58 }, { h: 'Siegquote', w: 58 }, { h: 'ROI', w: 45 }, { h: 'CHF/h', w: 52 }, { h: 'All-in %', w: 60 }],
+    X.arr.map(q => [mName(q.id), String(q.nights), { t: sgn(q.total), bold: true, color: nc(q.total) }, { t: sgn(Math.round(q.avg)), color: nc(q.avg) },
+      pct(q.wins, q.nights), q.roi == null ? '-' : pctS(q.roi), { t: q.perH == null ? '-' : sgn(Math.round(q.perH)), color: nc(q.perH) },
+      q.allins ? `${pct(q.allinWins, q.allins)} (${q.allins})` : '-']));
+  d.y -= 6;
+  d.table([{ h: 'Spieler', w: 115 }, { h: 'Max +', w: 60 }, { h: 'Max -', w: 60 }, { h: 'Serie', w: 65 }, { h: 'Streuung', w: 58 }, { h: 'Rebuys/Abend', w: 72 }, { h: 'Ø bis Rebuy', w: 65 }],
+    X.arr.map(q => [mName(q.id), { t: q.max > 0 ? sgn(q.max) : '-', color: q.max > 0 ? C_POS : C_TX }, { t: q.min < 0 ? sgn(q.min) : '-', color: q.min < 0 ? C_NEG : C_TX },
+      { t: q.streak ? q.streak.n + 'x ' + (q.streak.sg > 0 ? 'Plus' : 'Minus') : '-', color: q.streak ? nc(q.streak.sg) : C_TX },
+      q.sd == null ? '-' : NF.format(q.sd / 100), r1(q.rebuys / q.nights), q.ttrAvg ? fDur(q.ttrAvg) : '-']));
+  d.need(14); d.text(50, d.y, 'Siegquote = Anteil Abende im Plus. Streuung = Standardabweichung des Nettos pro Abend (CHF). Serie = aktuelle Plus- bzw. Minusserie.', { size: 7.5, color: C_MU }); d.y -= 6;
+
+  const tt = groupTitlesData(X);
+  if (tt.length) {
+    d.heading('Titel (alle Abende)');
+    tt.forEach(x => { d.need(16); d.text(54, d.y, x.name, { size: 10, bold: true }); d.text(250, d.y, x.who, { size: 10 }); d.text(545, d.y, x.val, { size: 10, align: 'right' }); d.y -= 16; });
+  }
+  if (Object.keys(X.beats).length) {
+    d.heading('Duelle (All-ins mit Gegner)');
+    d.table([{ h: 'Spieler', w: 125 }, { h: 'Knockouts', w: 70 }, { h: 'Nemesis', w: 150 }, { h: 'Lieblingsopfer', w: 150 }],
+      X.arr.map(q => { const x = duelData(X, q); return [mName(q.id), String(q.ko), x.nem, x.vic]; }));
+    if (X.arr.length <= 8) {
+      d.heading('Direktduelle: Zeile schlägt Spalte');
+      const cw = Math.min(55, Math.floor(380 / X.arr.length));
+      d.table([{ h: '', w: 115 }].concat(X.arr.map(o => ({ h: mName(o.id).slice(0, 9), w: cw }))),
+        X.arr.map(r => [mName(r.id)].concat(X.arr.map(c => r.id === c.id ? '-' : String((X.beats[r.id] || {})[c.id] || '·')))));
+    }
+  }
+}
+
 function sessionPdf(s) {
   const g = G(s.groupId), st = sessStats(s);
   const P = st.players.slice().sort((a, b) => (b.net ?? -1e15) - (a.net ?? -1e15));
@@ -775,6 +846,7 @@ function sessionPdf(s) {
     d.heading('Kommen und Gehen');
     moves.forEach(p => { d.need(16); d.text(54, d.y, mName(p.memberId), { size: 10 }); d.text(180, d.y, [p.joined ? 'ab ' + fTime(p.joined) : '', p.left ? 'bis ' + fTime(p.left) : ''].filter(Boolean).join(', '), { size: 10 }); d.y -= 16; });
   }
+  if (g) groupPdfSection(d, g);
   return d.build(`Pokerrunde · erstellt ${new Date().toLocaleDateString('de-CH')} ${fTime(Date.now())}`);
 }
 
@@ -792,7 +864,7 @@ async function shareOrDownload(content, name, type) {
   const blob = new Blob([content], { type });
   try {
     const file = new File([blob], name, { type });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return true; }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return true; }
   } catch (e) { if (e && e.name === 'AbortError') return false; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name;
