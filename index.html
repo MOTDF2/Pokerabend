@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pokerrunde">
+<meta name="theme-color" content="#14532d">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>Pokerrunde</title>
+<style>
+:root{--bg:#f2f5f3;--card:#fff;--tx:#15221b;--mu:#5d6b63;--bd:#dde4df;--pri:#166534;--pos:#15803d;--neg:#b91c1c;--hdr:#14532d;--chip:#e6eee9}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1411;--card:#18211c;--tx:#e6ece8;--mu:#9aa8a0;--bd:#2a3630;--pri:#15803d;--pos:#4ade80;--neg:#f87171;--hdr:#0f3d22;--chip:#22302a}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:'Aptos','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--tx);font-size:15px;line-height:1.4;
+ padding-top:calc(var(--hh,60px) + 10px);padding-bottom:calc(var(--fh,64px) + 16px);
+ padding-left:calc(12px + env(safe-area-inset-left));padding-right:calc(12px + env(safe-area-inset-right))}
+header{position:fixed;top:0;left:0;right:0;z-index:20;background:var(--hdr);color:#fff;
+ padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+.hrow{display:flex;align-items:center;height:50px;padding:0 4px}
+.hrow h1{flex:1;margin:0;font-size:18px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbtn{background:none;border:0;color:#fff;font-size:28px;width:44px;height:44px;line-height:1;cursor:pointer}
+footer{position:fixed;bottom:0;left:0;right:0;z-index:20;background:var(--card);border-top:1px solid var(--bd);
+ padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+footer nav{display:flex;max-width:720px;margin:0 auto}
+.tab{flex:1;background:none;border:0;padding:7px 0 6px;color:var(--mu);font:inherit;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer}
+.tab span{font-size:21px;line-height:1.2}
+.tab.on{color:var(--pri);font-weight:600}
+main{max-width:720px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
+.tap{cursor:pointer}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.ttl{font-weight:600;font-size:16px}
+.mu{color:var(--mu);font-size:13px}
+.chev{color:var(--mu);font-size:24px}
+.btn{font:inherit;font-size:15px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;padding:10px 14px;cursor:pointer}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.warn{background:#b45309;border-color:#b45309;color:#fff}
+.btn.bwin{background:#15803d;border-color:#15803d;color:#fff}
+.btn.blose{background:#b91c1c;border-color:#b91c1c;color:#fff}
+.btn.danger{color:var(--neg);border-color:var(--neg)}
+.btn:active{opacity:.75}
+.block{display:block;width:100%;margin:10px 0}
+.big{padding:14px;font-weight:600}
+.btns{display:flex;gap:8px;margin-top:10px}.btns .btn{flex:1;padding:12px 6px;font-weight:600}
+.ibtn{background:none;border:0;color:var(--mu);font-size:20px;min-width:36px;height:36px;cursor:pointer}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.num{font-variant-numeric:tabular-nums}
+h2{font-size:18px;margin:2px 0 10px}
+h3{font-size:12px;margin:18px 2px 8px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em}
+.seg{display:flex;gap:3px;background:var(--chip);border-radius:10px;padding:3px;position:sticky;top:calc(var(--hh,60px) + 4px);z-index:5;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.seg button{flex:1;font:inherit;font-size:14px;border:0;background:none;color:var(--tx);border-radius:8px;padding:8px 2px;cursor:pointer}
+.seg button.on{background:var(--card);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.sum{display:flex;justify-content:space-around;text-align:center;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:8px;
+ position:sticky;top:calc(var(--hh,60px) + 4px);z-index:5;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.sum b{font-size:17px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{font:inherit;font-size:15px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:18px;padding:8px 13px;cursor:pointer}
+.chip.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.hidden{display:none!important}
+.sheet{background:var(--bg);width:100%;max-width:720px;max-height:88%;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:16px 16px 0 0;
+ padding:16px calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+input[type=text],input[type=date],input[type=datetime-local],input[inputmode]{font:inherit;font-size:16px;width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);-webkit-appearance:none;appearance:none}
+label{display:block;margin:10px 0;font-size:13px;color:var(--mu)}
+label input{margin-top:4px}
+.lbl{font-size:13px;color:var(--mu);margin-top:10px}
+.chk{display:flex;gap:10px;align-items:center;color:var(--tx);font-size:15px}
+.chk input{width:22px;height:22px;margin:0;flex:none}
+.mbtns{display:flex;gap:8px;margin-top:14px}.mbtns .btn{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--fh,64px) + 12px);background:#1f2937;color:#fff;border-radius:12px;padding:10px 14px;z-index:60;display:flex;gap:14px;align-items:center;max-width:92%;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.toast button{font:inherit;background:none;border:0;color:#86efac;font-weight:700;cursor:pointer;padding:0}
+.banner{background:#fef3c7;color:#78350f;border-radius:10px;padding:10px 12px;margin-bottom:10px;cursor:pointer}
+.banner.err{background:#fee2e2;color:#7f1d1d;cursor:default}
+.banner.ok{background:#dcfce7;color:#14532d;cursor:default}
+.empty{text-align:center;color:var(--mu);padding:30px 10px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:4px}
+.tile{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px}
+.tile b{display:block;font-size:18px}
+.list{padding:2px 12px}
+.li{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--bd)}
+.li:last-child{border-bottom:0}
+.badge{font-size:12px;border-radius:10px;padding:2px 8px;background:var(--chip);white-space:nowrap}
+.badge.live{background:#dc2626;color:#fff}
+.bar{display:flex;align-items:center;gap:8px;margin:7px 0}
+.bn{width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.bt{flex:1;position:relative;height:14px}
+.bz{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--mu);opacity:.5}
+.bf{position:absolute;top:0;bottom:0;border-radius:3px;background:currentColor}
+.bv{width:74px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0}
+table{border-collapse:collapse;font-size:13px;white-space:nowrap;width:100%}
+th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--bd);font-variant-numeric:tabular-nums}
+th{color:var(--mu);font-weight:600;font-size:12px}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card);z-index:1}
+tr:last-child td{border-bottom:0}
+.chart{width:100%;height:auto;display:block}
+.ax{stroke:var(--mu);stroke-width:1;stroke-dasharray:3 3;opacity:.7}
+.axt{fill:var(--mu);font-size:10px}
+.lgd{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:13px}
+.lgd i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+.ico{font-size:22px;width:30px;text-align:center}
+details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14px}
+.card.gone{opacity:.75;background:var(--chip)}
+.sum>div{flex:1}.sum b{font-size:15px}
+.note{font-size:12px;color:var(--mu);margin:6px 2px}
+</style>
+</head>
+<body>
+<header id="hdr"><div class="hrow">
+ <button id="backBtn" class="hbtn" data-a="back" aria-label="Zurück">‹</button>
+ <h1 id="title">Pokerrunde</h1>
+ <button id="menuBtn" class="hbtn" data-a="hmenu" aria-label="Menü">⋯</button>
+</div></header>
+<main id="app"></main>
+<footer id="ftr"><nav>
+ <button class="tab" data-a="tab" data-t="groups"><span>♣</span>Gruppen</button>
+ <button class="tab" data-a="tab" data-t="members"><span>👥</span>Mitglieder</button>
+ <button class="tab" data-a="tab" data-t="data"><span>💾</span>Daten</button>
+</nav></footer>
+<div id="modal" class="modal hidden"><div class="sheet" id="sheet"></div></div>
+<div id="toast" class="toast hidden"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<script>
+'use strict';
+const APP_VERSION = '1.1';
+const BACKUP_DAYS = 14;
+const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
+
+/* ---------- Speicher (IndexedDB) ---------- */
+const Storage = {
+  _db: null,
+  open() {
+    if (this._db) return Promise.resolve(this._db);
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('pokerrunde', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => { this._db = r.result; res(this._db); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  async get(k) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const q = db.transaction('kv').objectStore('kv').get(k);
+      q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+    });
+  },
+  async set(k, v) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(v, k);
+      tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
+    });
+  }
+};
+
+let D = { members: [], groups: [], sessions: [] };
+let META = { lastBackup: null };
+const save = () => Storage.set('data', D).catch(e => toast('Speichern fehlgeschlagen: ' + e));
+const saveMeta = () => Storage.set('meta', META).catch(() => {});
+
+/* ---------- Hilfsfunktionen ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const NF = new Intl.NumberFormat('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const chf = c => 'CHF ' + NF.format((c || 0) / 100);
+const sgn = c => (c > 0 ? '+' : c < 0 ? '−' : '') + NF.format(Math.abs(c || 0) / 100);
+const cls = c => c > 0 ? 'pos' : c < 0 ? 'neg' : '';
+const parseAmt = s => {
+  if (s == null) return null;
+  s = String(s).trim().replace(/[’'\s]/g, '').replace(',', '.');
+  if (s === '') return null;
+  const x = Number(s);
+  return isFinite(x) ? Math.round(x * 100) : NaN;
+};
+const amtIn = c => c == null ? '' : (c / 100).toFixed(2);
+const pad = n => String(n).padStart(2, '0');
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const dtLocal = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const fDate = t => new Date(t).toLocaleDateString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+const fTime = t => new Date(t).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+const fDur = ms => { const m = Math.max(0, Math.round(ms / 60000)), h = Math.floor(m / 60); return h ? `${h} h ${pad(m % 60)} min` : `${m} min`; };
+const pctS = r => (r < 0 ? '−' : '') + Math.abs(Math.round(r * 100)) + ' %';
+const pct = (a, b) => b ? Math.round(a / b * 100) + ' %' : '–';
+const byName = (a, b) => a.name.localeCompare(b.name, 'de');
+const mName = id => (D.members.find(m => m.id === id) || { name: '?' }).name;
+const isArch = id => !!(D.members.find(m => m.id === id) || {}).archived;
+const G = id => D.groups.find(g => g.id === id);
+const S = id => D.sessions.find(s => s.id === id);
+const sortIds = ids => ids.slice().sort((a, b) => mName(a).localeCompare(mName(b), 'de'));
+
+/* ---------- Berechnungen ---------- */
+function sessStats(s) {
+  const end = s.end || Date.now();
+  const map = {};
+  s.players.forEach(p => map[p.memberId] = { id: p.memberId, buys: [], buy: 0, rebuys: 0, allins: 0, allinWins: 0, end: p.end ?? null, left: p.left || null, joined: p.joined || null, net: null, hours: 0, ttr: null });
+  s.events.slice().sort((a, b) => a.t - b.t).forEach(e => {
+    const p = map[e.memberId]; if (!p) return;
+    if (e.type === 'buyin') { p.buys.push(e.t); p.buy += e.amount; }
+    else if (e.type === 'allin') { p.allins++; if (e.won) p.allinWins++; }
+  });
+  const arr = Object.values(map);
+  arr.forEach(p => {
+    p.rebuys = Math.max(0, p.buys.length - 1);
+    if (p.end != null) p.net = p.end - p.buy;
+    const pe = p.left && p.left > s.start && p.left < end ? p.left : end;
+    let st = p.buys.length ? p.buys[0] : s.start;
+    if (st < s.start || st > pe) st = s.start;
+    p.hours = Math.max(0, (pe - st) / 3600000);
+    if (p.buys.length > 1 && p.buys[1] - p.buys[0] >= 60000) p.ttr = p.buys[1] - p.buys[0];
+  });
+  const pot = arr.reduce((a, p) => a + p.buy, 0);
+  const endSum = arr.reduce((a, p) => a + (p.end || 0), 0);
+  return { players: arr, map, pot, endSum, diff: endSum - pot, dur: end - s.start };
+}
+
+function settleTx(players) {
+  const cr = players.filter(p => p.net > 0).map(p => ({ id: p.id, v: p.net })).sort((a, b) => b.v - a.v);
+  const db = players.filter(p => p.net < 0).map(p => ({ id: p.id, v: -p.net })).sort((a, b) => b.v - a.v);
+  const tx = []; let i = 0, j = 0;
+  while (i < db.length && j < cr.length) {
+    const x = Math.min(db[i].v, cr[j].v);
+    if (x > 0) tx.push({ from: db[i].id, to: cr[j].id, v: x });
+    db[i].v -= x; cr[j].v -= x;
+    if (db[i].v === 0) i++;
+    if (cr[j].v === 0) j++;
+  }
+  return tx;
+}
+
+function best(arr, f, dir) {
+  if (!arr.length) return [];
+  const vals = arr.map(f), m = dir > 0 ? Math.max(...vals) : Math.min(...vals);
+  return arr.filter((p, i) => vals[i] === m);
+}
+function titleRow(icon, name, winners, val) {
+  if (!winners.length) return '';
+  return `<div class="li"><span class="ico">${icon}</span><span class="grow"><b>${esc(name)}</b><div class="mu">${esc(winners.map(p => mName(p.id)).join(', '))}</div></span><span class="num">${val(winners[0])}</span></div>`;
+}
+
+function nightTitles(st) {
+  const P = st.players.filter(p => p.net != null);
+  const q = p => p.allinWins / p.allins;
+  const ai2 = P.filter(p => p.allins >= 2);
+  const lucky = best(ai2, q, 1), unlucky = best(ai2, q, -1);
+  let h = '';
+  h += titleRow('🦈', 'Haifisch', best(P.filter(p => p.net > 0), p => p.net, 1), p => sgn(p.net));
+  h += titleRow('👑', 'Comeback-König', best(P.filter(p => p.net > 0 && p.rebuys > 0), p => p.net, 1), p => `${p.rebuys} Rebuy${p.rebuys > 1 ? 's' : ''}`);
+  h += titleRow('🏧', 'Bankautomat', best(P.filter(p => p.rebuys > 0), p => p.rebuys, 1), p => `${p.rebuys} Rebuy${p.rebuys > 1 ? 's' : ''}`);
+  h += titleRow('💥', 'Kamikaze', best(P.filter(p => p.allins > 0), p => p.allins, 1), p => `${p.allins} All-in${p.allins > 1 ? 's' : ''}`);
+  h += titleRow('🍀', 'Glückspilz', lucky, p => pct(p.allinWins, p.allins));
+  if (lucky.length && unlucky.length && q(unlucky[0]) < q(lucky[0])) h += titleRow('🌧️', 'Pechvogel', unlucky, p => pct(p.allinWins, p.allins));
+  return h;
+}
+
+function groupStats(g) {
+  const ss = D.sessions.filter(s => s.groupId === g.id && s.status === 'closed').sort((a, b) => a.start - b.start);
+  const P = {}, beats = {}, cum = {}, series = [];
+  const get = id => P[id] || (P[id] = { id, nights: 0, nets: [], total: 0, buy: 0, rebuys: 0, allins: 0, allinWins: 0, hours: 0, ttr: [], ko: 0, wins: 0 });
+  let durSum = 0, plSum = 0, potSum = 0;
+  ss.forEach(s => {
+    const st = sessStats(s);
+    durSum += st.dur; plSum += st.players.length; potSum += st.pot;
+    st.players.forEach(p => {
+      const q = get(p.id), net = p.net ?? 0;
+      q.nights++; q.nets.push(net); q.total += net; q.buy += p.buy; q.rebuys += p.rebuys;
+      q.allins += p.allins; q.allinWins += p.allinWins; q.hours += p.hours;
+      if (p.ttr != null) q.ttr.push(p.ttr);
+      if (net > 0) q.wins++;
+      cum[p.id] = (cum[p.id] || 0) + net;
+    });
+    s.events.forEach(e => {
+      if (e.type !== 'allin' || !e.opp || !st.map[e.opp]) return;
+      const w = e.won ? e.memberId : e.opp, l = e.won ? e.opp : e.memberId;
+      (beats[w] || (beats[w] = {}))[l] = ((beats[w] || {})[l] || 0) + 1;
+      if (!e.won) get(e.opp).ko++;
+    });
+    series.push({ t: s.start, cum: { ...cum } });
+  });
+  const arr = Object.values(P);
+  arr.forEach(q => {
+    q.avg = q.total / q.nights;
+    q.sd = q.nights > 1 ? Math.sqrt(q.nets.reduce((a, x) => a + (x - q.avg) ** 2, 0) / (q.nights - 1)) : null;
+    q.max = Math.max(...q.nets); q.min = Math.min(...q.nets);
+    let k = 0, sg = 0;
+    for (let i = q.nets.length - 1; i >= 0; i--) {
+      const sn = Math.sign(q.nets[i]);
+      if (sn === 0) break;
+      if (!sg) sg = sn;
+      if (sn !== sg) break;
+      k++;
+    }
+    q.streak = k ? { n: k, sg } : null;
+    q.ttrAvg = q.ttr.length ? q.ttr.reduce((a, b) => a + b, 0) / q.ttr.length : null;
+    q.perH = q.hours > 0 ? q.total / q.hours : null;
+    q.roi = q.buy ? q.total / q.buy : null;
+  });
+  arr.sort((a, b) => b.total - a.total);
+  return { ss, arr, beats, series, durAvg: ss.length ? durSum / ss.length : 0, plAvg: ss.length ? plSum / ss.length : 0, potAvg: ss.length ? potSum / ss.length : 0 };
+}
+
+/* ---------- Navigation ---------- */
+let stack = [{ v: 'groups' }];
+let M = {};
+const cur = () => stack[stack.length - 1];
+function go(v) { stack.push(v); render(); window.scrollTo(0, 0); }
+function back() { if (stack.length > 1) { stack.pop(); render(); } }
+function setTab(t) { stack = [{ v: t }]; render(); window.scrollTo(0, 0); }
+
+function render() {
+  const c = cur();
+  let r;
+  try { r = VIEWS[c.v](c); }
+  catch (e) { console.error(e); r = { title: 'Fehler', html: `<div class="banner err">${esc(e.message)}</div>` }; }
+  if (!r) { if (stack.length > 1) { stack.pop(); return render(); } r = { title: '', html: '' }; }
+  $('title').textContent = r.title;
+  $('backBtn').style.visibility = stack.length > 1 ? 'visible' : 'hidden';
+  $('menuBtn').style.visibility = r.menu ? 'visible' : 'hidden';
+  $('app').innerHTML = r.html;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === stack[0].v));
+  measure();
+}
+
+function measure() {
+  const r = document.documentElement.style;
+  r.setProperty('--hh', $('hdr').offsetHeight + 'px');
+  r.setProperty('--fh', $('ftr').offsetHeight + 'px');
+}
+
+/* ---------- Modal & Toast ---------- */
+function modal(html) { $('sheet').innerHTML = html; $('modal').classList.remove('hidden'); $('sheet').scrollTop = 0; }
+function closeModal() { $('modal').classList.add('hidden'); $('sheet').innerHTML = ''; }
+let toastTimer = null;
+function toast(msg, label, fn) {
+  const t = $('toast');
+  t.innerHTML = `<span>${esc(msg)}</span>` + (label ? `<button type="button">${esc(label)}</button>` : '');
+  t.classList.remove('hidden');
+  if (label) t.querySelector('button').onclick = () => { t.classList.add('hidden'); fn(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), label ? 6000 : 2500);
+}
+function askText(title, value, onSave, extra) {
+  M.onText = onSave;
+  modal(`<h2>${esc(title)}</h2><label>Name<input type="text" data-f="txt" value="${esc(value)}" autocomplete="off"></label>${extra || ''}
+  <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="textSave">Speichern</button></div>`);
+  setTimeout(() => { const i = document.querySelector('[data-f=txt]'); if (i) i.focus(); }, 50);
+}
+function chipsHtml(ids, selected, action) {
+  if (!ids.length) return '<div class="mu">Keine verfügbar.</div>';
+  return `<div class="chips">${sortIds(ids).map(id => `<button class="chip ${selected.has(id) ? 'on' : ''}" data-a="${action}" data-id="${id}">${esc(mName(id))}</button>`).join('')}</div>`;
+}
+
+/* ---------- Ansichten ---------- */
+const VIEWS = {
+  groups() {
+    let h = '';
+    if (backupDue()) {
+      const d = META.lastBackup ? Math.floor((Date.now() - META.lastBackup) / 86400000) : null;
+      h += `<div class="banner" data-a="tab" data-t="data">💾 Letzte Datensicherung: ${d == null ? 'noch nie' : 'vor ' + d + ' Tagen'}. Jetzt sichern ›</div>`;
+    }
+    if (!D.groups.length) h += `<div class="empty">Noch keine Gruppe vorhanden.</div>`;
+    D.groups.slice().sort(byName).forEach(g => {
+      const ss = D.sessions.filter(s => s.groupId === g.id);
+      const open = ss.some(s => s.status === 'open');
+      h += `<div class="card tap" data-a="openGroup" data-id="${g.id}"><div class="row"><div class="grow"><div class="ttl">${esc(g.name)}</div>
+        <div class="mu">${g.memberIds.length} Mitglieder · ${ss.length} Abende</div></div>${open ? '<span class="badge live">läuft</span>' : ''}<span class="chev">›</span></div></div>`;
+    });
+    h += `<button class="btn pri block big" data-a="newGroup">+ Neue Gruppe</button>`;
+    return { title: 'Gruppen', html: h };
+  },
+
+  group(c) {
+    const g = G(c.id); if (!g) return null;
+    const sub = c.sub || 'nights';
+    const segs = [['nights', 'Abende'], ['stats', 'Statistik'], ['members', 'Mitglieder'], ['settings', 'Einstell.']];
+    let h = `<div class="seg">${segs.map(([k, l]) => `<button class="${sub === k ? 'on' : ''}" data-a="gtab" data-t="${k}">${l}</button>`).join('')}</div>`;
+    if (sub === 'nights') h += nightsHtml(g);
+    else if (sub === 'stats') h += statsHtml(g);
+    else if (sub === 'members') h += groupMembersHtml(g);
+    else h += groupSettingsHtml(g);
+    return { title: g.name, html: h };
+  },
+
+  session(c) {
+    const s = S(c.id); if (!s) return null;
+    return { title: fDate(s.start), html: s.status === 'open' ? liveHtml(s) : resultHtml(s), menu: true };
+  },
+
+  settle(c) {
+    const s = S(c.id); if (!s) return null;
+    const st = sessStats(s);
+    let h = `<div class="note">Endbetrag = Chips bzw. Geld, das der Spieler am Schluss vor sich hat (in CHF).</div>`;
+    st.players.slice().sort((a, b) => mName(a.id).localeCompare(mName(b.id), 'de')).forEach(p => {
+      h += `<div class="card"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}</div><div class="mu">Buy-ins: ${p.buys.length}× · ${chf(p.buy)}${p.left ? ` · gegangen ${fTime(p.left)}` : ''}</div></div>
+        <div style="width:120px"><input inputmode="decimal" class="endInp" data-m="${p.id}" value="${amtIn(p.end)}" placeholder="0.00"></div></div></div>`;
+    });
+    h += `<div class="card" data-sum></div>`;
+    h += `<button class="btn pri block big" data-a="settleSave">Abend abschliessen</button>`;
+    setTimeout(updateSettleSum, 0);
+    return { title: 'Endbeträge', html: h };
+  },
+
+  members() {
+    let h = `<button class="btn pri block big" data-a="newMember">+ Neues Mitglied</button>`;
+    const act = D.members.filter(m => !m.archived).sort(byName), arc = D.members.filter(m => m.archived).sort(byName);
+    const row = m => {
+      const gs = D.groups.filter(g => g.memberIds.includes(m.id)).map(g => g.name);
+      return `<div class="li tap" data-a="memberMenu" data-id="${m.id}"><span class="grow"><b>${esc(m.name)}</b><div class="mu">${gs.length ? esc(gs.join(', ')) : 'keiner Gruppe zugeordnet'}</div></span><span class="chev">›</span></div>`;
+    };
+    if (!act.length) h += `<div class="empty">Noch keine Mitglieder.</div>`;
+    else h += `<div class="card list">${act.map(row).join('')}</div>`;
+    if (arc.length) h += `<h3>Archiviert</h3><div class="card list">${arc.map(row).join('')}</div>`;
+    return { title: 'Mitglieder', html: h };
+  },
+
+  data() {
+    const n = D.sessions.length;
+    let h = `<h3>Datensicherung</h3><div class="card">
+      <div>Letzte Sicherung: <b>${META.lastBackup ? fDate(META.lastBackup) + ', ' + fTime(META.lastBackup) : 'noch nie'}</b></div>
+      <button class="btn pri block" data-a="exportJson">Backup exportieren (JSON)</button>
+      <button class="btn block" data-a="importJson">Backup importieren</button>
+      <div class="note">Die Daten liegen nur auf diesem Gerät. Safari und die installierte Homescreen-App haben getrennte Speicher: Backup und Import immer in der Homescreen-App machen.</div></div>
+      <h3>Bestand</h3><div class="card">${D.members.length} Mitglieder · ${D.groups.length} Gruppen · ${n} Abende</div>
+      <h3>Info</h3><div class="card"><div>Pokerrunde · Version ${APP_VERSION}</div><div class="mu">Cash Game · offline · ohne Login</div></div>`;
+    return { title: 'Daten', html: h };
+  }
+};
+
+function nightsHtml(g) {
+  const ss = D.sessions.filter(s => s.groupId === g.id).sort((a, b) => (a.status === b.status ? b.start - a.start : a.status === 'open' ? -1 : 1));
+  let h = `<button class="btn pri block big" data-a="newSession">+ Neuer Abend</button>`;
+  if (!ss.length) return h + `<div class="empty">Noch keine Abende erfasst.</div>`;
+  ss.forEach(s => {
+    const st = sessStats(s);
+    let info = `${s.players.length} Spieler · Pot ${chf(st.pot)}`;
+    if (s.status === 'closed') {
+      const w = best(st.players.filter(p => p.net > 0), p => p.net, 1);
+      if (w.length) info += ` · 🦈 ${esc(w.map(p => mName(p.id)).join(', '))} ${sgn(w[0].net)}`;
+    }
+    h += `<div class="card tap" data-a="openSession" data-id="${s.id}"><div class="row"><div class="grow"><div class="ttl">${fDate(s.start)}</div><div class="mu">${info}</div></div>
+      ${s.status === 'open' ? '<span class="badge live">läuft</span>' : (st.diff !== 0 ? '<span class="badge" style="color:var(--neg)">Differenz</span>' : '')}<span class="chev">›</span></div></div>`;
+  });
+  return h;
+}
+
+function groupMembersHtml(g) {
+  let h = `<div class="card list">`;
+  if (!g.memberIds.length) h += `<div class="li mu">Noch keine Mitglieder in dieser Gruppe.</div>`;
+  sortIds(g.memberIds).forEach(id => {
+    h += `<div class="li"><span class="grow"><b>${esc(mName(id))}</b>${isArch(id) ? ' <span class="badge">archiviert</span>' : ''}</span><button class="btn danger" data-a="gRemoveMember" data-m="${id}">Entfernen</button></div>`;
+  });
+  h += `</div>`;
+  const others = D.members.filter(m => !m.archived && !g.memberIds.includes(m.id)).map(m => m.id);
+  h += `<h3>Hinzufügen</h3>${others.length ? chipsHtml(others, new Set(), 'gAddMember') : '<div class="mu">Alle aktiven Mitglieder sind bereits in der Gruppe.</div>'}`;
+  h += `<button class="btn block" data-a="gNewMember">+ Neues Mitglied anlegen und hinzufügen</button>`;
+  h += `<div class="note">Entfernte Mitglieder bleiben in vergangenen Abenden und in der Statistik erhalten.</div>`;
+  return h;
+}
+
+function groupSettingsHtml(g) {
+  return `<div class="card"><label>Gruppenname<input type="text" data-f="gName" value="${esc(g.name)}"></label>
+    <label>Standard-Buy-in (CHF)<input inputmode="decimal" data-f="gBuy" value="${amtIn(g.buyIn)}"></label>
+    <button class="btn pri block" data-a="gSave">Speichern</button></div>
+    <button class="btn block" data-a="exportCsv">Abende als CSV exportieren (Excel)</button>
+    <button class="btn danger block" data-a="delGroup">Gruppe löschen</button>`;
+}
+
+function liveHtml(s) {
+  const g = G(s.groupId), st = sessStats(s);
+  const act = s.players.filter(p => !p.left), gone = s.players.filter(p => p.left);
+  const paid = gone.reduce((a, p) => a + (p.end || 0), 0);
+  let h = `<div class="sum"><div><div class="mu">Pot</div><b class="num">${NF.format(st.pot / 100)}</b></div><div><div class="mu">Am Tisch</div><b class="num">${NF.format((st.pot - paid) / 100)}</b></div><div><div class="mu">Dauer</div><b data-dur>${fDur(st.dur)}</b></div><div><div class="mu">Spieler</div><b>${act.length}${gone.length ? `<span class="mu"> +${gone.length}</span>` : ''}</b></div></div>`;
+  act.forEach(pl => {
+    const p = st.map[pl.memberId];
+    h += `<div class="card"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}${pl.joined ? ` <span class="badge">ab ${fTime(pl.joined)}</span>` : ''}</div>
+      <div class="mu">${p.buys.length}× Buy-in · ${chf(p.buy)}${p.allins ? ` · All-in ${p.allinWins}/${p.allins}` : ''}</div></div>
+      <button class="ibtn" data-a="pmenu" data-m="${p.id}" aria-label="Optionen">⋯</button></div>
+      <div class="btns"><button class="btn pri" data-a="buy" data-m="${p.id}">+ ${p.buys.length ? 'Rebuy' : 'Buy-in'} ${NF.format(g.buyIn / 100)}</button>
+      <button class="btn warn" data-a="allin" data-m="${p.id}">All-in</button></div></div>`;
+  });
+  h += `<button class="btn block" data-a="addPlayers">+ Spieler stösst dazu</button>`;
+  if (gone.length) {
+    h += `<h3>Gegangen</h3>`;
+    gone.forEach(pl => {
+      const p = st.map[pl.memberId];
+      h += `<div class="card gone"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))} <span class="badge">${fTime(pl.left)}</span></div>
+        <div class="mu">Buy-ins ${chf(p.buy)} · ausbezahlt ${chf(p.end)} · <b class="${cls(p.net)}">${sgn(p.net)}</b></div></div>
+        <button class="ibtn" data-a="pmenu" data-m="${p.id}" aria-label="Optionen">⋯</button></div></div>`;
+    });
+  }
+  h += `<button class="btn pri block big" data-a="endSession">Abend beenden: Endbeträge erfassen</button>`;
+  h += logHtml(s, false);
+  return h;
+}
+
+function logHtml(s, collapsed) {
+  const ev = s.events.concat(
+    s.players.filter(p => p.joined).map(p => ({ t: p.joined, type: 'join', memberId: p.memberId })),
+    s.players.filter(p => p.left).map(p => ({ t: p.left, type: 'leave', memberId: p.memberId, amount: p.end }))
+  ).sort((a, b) => b.t - a.t);
+  if (!ev.length) return '';
+  let h = `<div class="card list">`;
+  ev.forEach(e => {
+    if (e.type === 'join' || e.type === 'leave') {
+      h += `<div class="li"><span class="mu num">${fTime(e.t)}</span><span class="grow"><b>${esc(mName(e.memberId))}</b> · ${e.type === 'join' ? 'stösst dazu' : 'geht, ausbezahlt ' + chf(e.amount)}</span></div>`;
+      return;
+    }
+    const t = e.type === 'buyin' ? `Buy-in ${chf(e.amount)}` : `All-in ${e.won ? 'gewonnen' : 'verloren'}${e.opp ? ` gegen ${esc(mName(e.opp))}` : ''}`;
+    h += `<div class="li"><span class="mu num">${fTime(e.t)}</span><span class="grow"><b>${esc(mName(e.memberId))}</b> · ${t}</span><button class="ibtn" data-a="delEvent" data-id="${e.id}" aria-label="Löschen">✕</button></div>`;
+  });
+  h += `</div>`;
+  return collapsed ? `<details><summary>Verlauf (${ev.length} Einträge)</summary>${h}</details>` : `<h3>Verlauf</h3>${h}`;
+}
+
+function resultHtml(s) {
+  const st = sessStats(s);
+  const P = st.players.slice().sort((a, b) => (b.net ?? -1e15) - (a.net ?? -1e15));
+  let h = `<div class="tiles"><div class="tile"><span class="mu">Pot</span><b class="num">${chf(st.pot)}</b></div><div class="tile"><span class="mu">Dauer</span><b>${fDur(st.dur)}</b></div></div>`;
+  if (st.diff !== 0) h += `<div class="banner err">⚠️ Kontrollsumme stimmt nicht: Endbeträge ${chf(st.endSum)}, Buy-ins ${chf(st.pot)} (Differenz ${sgn(st.diff)}). <u data-a="editEnds">Korrigieren</u></div>`;
+  h += `<h3>Resultat</h3><div class="card tw"><table><tr><th>Spieler</th><th>Buy-in</th><th>Ende</th><th>Netto</th><th>ROI</th></tr>`;
+  P.forEach(p => {
+    h += `<tr><td>${esc(mName(p.id))}</td><td>${NF.format(p.buy / 100)}</td><td>${p.end == null ? '–' : NF.format(p.end / 100)}</td><td class="${cls(p.net)}"><b>${p.net == null ? '–' : sgn(p.net)}</b></td><td>${p.buy && p.net != null ? pctS(p.net / p.buy) : '–'}</td></tr>`;
+  });
+  h += `</table></div>`;
+  const tx = settleTx(P.map(p => ({ id: p.id, net: p.net || 0 })));
+  h += `<h3>Ausgleich</h3><div class="card list">`;
+  h += tx.length ? tx.map(t => `<div class="li"><span class="grow">${esc(mName(t.from))} → <b>${esc(mName(t.to))}</b></span><span class="num">${chf(t.v)}</span></div>`).join('') : `<div class="li mu">Kein Ausgleich nötig.</div>`;
+  h += `</div><div class="note">Gilt, wenn die Buy-ins nicht bar in eine gemeinsame Kasse bezahlt wurden.</div>`;
+  const tt = nightTitles(st);
+  if (tt) h += `<h3>Titel des Abends</h3><div class="card list">${tt}</div>`;
+  h += `<h3>Details</h3><div class="card tw"><table><tr><th>Spieler</th><th>Rebuys</th><th>All-ins</th><th>gewonnen</th><th>CHF/h</th><th>bis Rebuy</th></tr>`;
+  P.forEach(p => {
+    h += `<tr><td>${esc(mName(p.id))}</td><td>${p.rebuys}</td><td>${p.allins}</td><td>${pct(p.allinWins, p.allins)}</td><td class="${cls(p.net)}">${p.net != null && p.hours > 0 ? sgn(Math.round(p.net / p.hours)) : '–'}</td><td>${p.ttr ? fDur(p.ttr) : '–'}</td></tr>`;
+  });
+  h += `</table></div>`;
+  h += `<button class="btn block" data-a="editEnds">Endbeträge bearbeiten</button><button class="btn block" data-a="reopen">Abend wieder öffnen</button>`;
+  h += logHtml(s, true);
+  return h;
+}
+
+function tile(l, v) { return `<div class="tile"><span class="mu">${l}</span><b class="num">${v}</b></div>`; }
+
+function statsHtml(g) {
+  const X = groupStats(g);
+  if (!X.ss.length) return `<div class="empty">Noch keine abgeschlossenen Abende.<br>Statistiken erscheinen, sobald ein Abend abgeschlossen ist.</div>`;
+  let h = `<div class="tiles">${tile('Abende', X.ss.length)}${tile('Ø Dauer', fDur(X.durAvg))}${tile('Ø Spieler', (Math.round(X.plAvg * 10) / 10).toLocaleString('de-CH'))}${tile('Ø Pot', chf(X.potAvg))}</div>`;
+
+  const mx = Math.max(1, ...X.arr.map(q => Math.abs(q.total)));
+  h += `<h3>Gesamtbilanz (CHF)</h3><div class="card">` + X.arr.map(q => {
+    const w = Math.abs(q.total) / mx * 50;
+    return `<div class="bar"><span class="bn">${esc(mName(q.id))}</span><span class="bt"><span class="bz"></span><span class="bf ${cls(q.total)}" style="${q.total >= 0 ? 'left' : 'right'}:50%;width:${w.toFixed(1)}%"></span></span><span class="bv ${cls(q.total)}">${sgn(q.total)}</span></div>`;
+  }).join('') + `</div>`;
+
+  if (X.ss.length >= 2) h += `<h3>Verlauf kumuliert (CHF)</h3><div class="card">${lineChart(X)}</div>`;
+
+  h += `<h3>Rangliste</h3><div class="card tw"><table><tr><th>Spieler</th><th>Abende</th><th>Bilanz</th><th>Ø/Abend</th><th>Siegquote</th><th>ROI</th><th>CHF/h</th><th>Streuung</th><th>Max +</th><th>Max −</th><th>Serie</th><th>Rebuys/Abend</th><th>All-in %</th><th>Ø bis Rebuy</th></tr>`;
+  X.arr.forEach(q => {
+    h += `<tr><td>${esc(mName(q.id))}</td><td>${q.nights}</td><td class="${cls(q.total)}"><b>${sgn(q.total)}</b></td><td class="${cls(q.avg)}">${sgn(Math.round(q.avg))}</td>
+      <td>${pct(q.wins, q.nights)}</td><td>${q.roi == null ? '–' : pctS(q.roi)}</td><td class="${cls(q.perH)}">${q.perH == null ? '–' : sgn(Math.round(q.perH))}</td>
+      <td>${q.sd == null ? '–' : NF.format(q.sd / 100)}</td><td class="pos">${q.max > 0 ? sgn(q.max) : '–'}</td><td class="neg">${q.min < 0 ? sgn(q.min) : '–'}</td>
+      <td class="${q.streak ? (q.streak.sg > 0 ? 'pos' : 'neg') : ''}">${q.streak ? q.streak.n + '× ' + (q.streak.sg > 0 ? 'Plus' : 'Minus') : '–'}</td>
+      <td>${(Math.round(q.rebuys / q.nights * 10) / 10).toLocaleString('de-CH')}</td><td>${pct(q.allinWins, q.allins)}${q.allins ? ` <span class="mu">(${q.allins})</span>` : ''}</td><td>${q.ttrAvg ? fDur(q.ttrAvg) : '–'}</td></tr>`;
+  });
+  h += `</table></div><div class="note">Siegquote = Anteil Abende im Plus. Streuung = Standardabweichung des Nettos pro Abend (CHF). Serie = aktuelle Plus- bzw. Minusserie.</div>`;
+
+  const A = X.arr, qa = q => q.allinWins / q.allins;
+  let t = '';
+  t += titleRow('🦈', 'Haifisch (höchste Bilanz)', best(A.filter(q => q.total > 0), q => q.total, 1), q => sgn(q.total));
+  t += titleRow('🏆', 'Meiste Abende im Plus', best(A.filter(q => q.wins > 0), q => q.wins, 1), q => q.wins + '×');
+  t += titleRow('🏧', 'Bankautomat (Rebuys/Abend)', best(A.filter(q => q.rebuys > 0), q => q.rebuys / q.nights, 1), q => (Math.round(q.rebuys / q.nights * 10) / 10).toLocaleString('de-CH'));
+  t += titleRow('💥', 'Kamikaze (All-ins/Abend)', best(A.filter(q => q.allins > 0), q => q.allins / q.nights, 1), q => (Math.round(q.allins / q.nights * 10) / 10).toLocaleString('de-CH'));
+  const a5 = A.filter(q => q.allins >= 5);
+  const lk = best(a5, qa, 1), ul = best(a5, qa, -1);
+  t += titleRow('🍀', 'Glückspilz (ab 5 All-ins)', lk, q => pct(q.allinWins, q.allins));
+  if (lk.length && ul.length && qa(ul[0]) < qa(lk[0])) t += titleRow('🌧️', 'Pechvogel (ab 5 All-ins)', ul, q => pct(q.allinWins, q.allins));
+  t += titleRow('🎯', 'Knockout-König', best(A.filter(q => q.ko > 0), q => q.ko, 1), q => q.ko + ' KOs');
+  t += titleRow('🧊', 'Mr. Konstant (ab 3 Abenden)', best(A.filter(q => q.sd != null && q.nights >= 3), q => q.sd, -1), q => '± ' + NF.format(q.sd / 100));
+  if (t) h += `<h3>Titel (alle Abende)</h3><div class="card list">${t}</div>`;
+
+  const hasDuels = Object.keys(X.beats).length > 0;
+  if (hasDuels) {
+    h += `<h3>Duelle (All-ins mit Gegner)</h3><div class="card tw"><table><tr><th>Spieler</th><th>Knockouts</th><th>Nemesis</th><th>Lieblingsopfer</th></tr>`;
+    A.forEach(q => {
+      const lostTo = A.filter(o => o.id !== q.id && ((X.beats[o.id] || {})[q.id] || 0) > 0);
+      const nem = best(lostTo, o => X.beats[o.id][q.id], 1);
+      const wonVs = A.filter(o => o.id !== q.id && ((X.beats[q.id] || {})[o.id] || 0) > 0);
+      const vic = best(wonVs, o => X.beats[q.id][o.id], 1);
+      h += `<tr><td>${esc(mName(q.id))}</td><td>${q.ko}</td><td>${nem.length ? esc(nem.map(o => mName(o.id)).join(', ')) + ` (${X.beats[nem[0].id][q.id]})` : '–'}</td><td>${vic.length ? esc(vic.map(o => mName(o.id)).join(', ')) + ` (${X.beats[q.id][vic[0].id]})` : '–'}</td></tr>`;
+    });
+    h += `</table></div>`;
+    h += `<h3>Direktduelle: Zeile schlägt Spalte</h3><div class="card tw"><table><tr><th></th>${A.map(o => `<th>${esc(mName(o.id))}</th>`).join('')}</tr>`;
+    A.forEach(r => {
+      h += `<tr><td>${esc(mName(r.id))}</td>${A.map(c => r.id === c.id ? '<td class="mu">–</td>' : `<td>${(X.beats[r.id] || {})[c.id] || '·'}</td>`).join('')}</tr>`;
+    });
+    h += `</table></div><div class="note">Zählt gewonnene All-in-Duelle, bei denen der Gegner erfasst wurde. Knockout = Gegner hat sein All-in gegen diesen Spieler verloren.</div>`;
+  } else {
+    h += `<div class="note">Duell-Statistiken (Nemesis, Knockouts) erscheinen, sobald bei All-ins ein Gegner erfasst wird.</div>`;
+  }
+  return h;
+}
+
+function lineChart(X) {
+  const ids = X.arr.map(q => q.id), n = X.series.length;
+  const pts = ids.map(id => { let last = 0; const a = [0]; X.series.forEach(x => { if (x.cum[id] != null) last = x.cum[id]; a.push(last); }); return a; });
+  const all = pts.flat();
+  let lo = Math.min(0, ...all), hi = Math.max(0, ...all);
+  if (hi === lo) hi = lo + 100;
+  const W = 340, H = 190, L = 40, R = 8, T = 10, B = 20;
+  const xp = i => L + i / n * (W - L - R), yp = v => T + (hi - v) / (hi - lo) * (H - T - B);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Kumulierter Verlauf">`;
+  svg += `<line x1="${L}" x2="${W - R}" y1="${yp(0).toFixed(1)}" y2="${yp(0).toFixed(1)}" class="ax"/>`;
+  const lbl = v => Math.round(v / 100).toLocaleString('de-CH');
+  [hi, lo].forEach(v => { if (v !== 0) svg += `<text x="${L - 4}" y="${(yp(v) + 4).toFixed(1)}" text-anchor="end" class="axt">${lbl(v)}</text>`; });
+  svg += `<text x="${L - 4}" y="${(yp(0) + 4).toFixed(1)}" text-anchor="end" class="axt">0</text>`;
+  svg += `<text x="${L}" y="${H - 4}" class="axt">Start</text><text x="${W - R}" y="${H - 4}" text-anchor="end" class="axt">Abend ${n}</text>`;
+  pts.forEach((a, k) => { svg += `<polyline fill="none" stroke="${COL[k % COL.length]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${a.map((v, i) => xp(i).toFixed(1) + ',' + yp(v).toFixed(1)).join(' ')}"/>`; });
+  svg += `</svg>`;
+  return svg + `<div class="lgd">${ids.map((id, k) => `<span><i style="background:${COL[k % COL.length]}"></i>${esc(mName(id))}</span>`).join('')}</div>`;
+}
+
+function updateSettleSum() {
+  const box = document.querySelector('[data-sum]'); if (!box) return;
+  const s = S(cur().id); if (!s) return;
+  const st = sessStats(s);
+  let sum = 0, bad = false, empty = 0;
+  document.querySelectorAll('.endInp').forEach(i => { const v = parseAmt(i.value); if (v == null) empty++; else if (isNaN(v) || v < 0) bad = true; else sum += v; });
+  const diff = sum - st.pot;
+  box.innerHTML = `<div class="row"><span class="grow">Summe Buy-ins</span><b class="num">${chf(st.pot)}</b></div>
+    <div class="row"><span class="grow">Summe Endbeträge</span><b class="num">${chf(sum)}</b></div>
+    <div class="row"><span class="grow">Differenz</span><b class="num ${diff === 0 ? 'pos' : 'neg'}">${diff === 0 ? '✓ stimmt' : sgn(diff)}</b></div>
+    ${bad ? '<div class="neg">Ungültige Eingabe.</div>' : ''}${empty ? `<div class="mu">${empty} Feld${empty > 1 ? 'er' : ''} leer.</div>` : ''}`;
+}
+
+/* ---------- Aktionen ---------- */
+function addBuy(s, memberId, amount, t) {
+  const e = { id: uid(), t: t || Date.now(), type: 'buyin', memberId, amount };
+  s.events.push(e);
+  return e;
+}
+function backupDue() {
+  if (!D.sessions.length) return false;
+  return !META.lastBackup || Date.now() - META.lastBackup > BACKUP_DAYS * 86400000;
+}
+async function shareOrDownload(content, name, type) {
+  const blob = new Blob([content], { type });
+  try {
+    const file = new File([blob], name, { type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return true; }
+  } catch (e) { if (e && e.name === 'AbortError') return false; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  return true;
+}
+function csvCell(v) { v = String(v ?? ''); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+
+const A = {
+  back, tab: el => setTab(el.dataset.t),
+  modalClose: closeModal,
+  hmenu() {
+    const s = S(cur().id); if (!s) return;
+    modal(`<h2>Abend ${fDate(s.start)}</h2>
+      <button class="btn block" data-a="editTimes">Start-/Endzeit ändern</button>
+      ${s.status === 'open' ? '<button class="btn block" data-a="addPlayers">Spieler stösst dazu</button>' : '<button class="btn block" data-a="editEnds">Endbeträge bearbeiten</button><button class="btn block" data-a="reopen">Wieder öffnen</button>'}
+      <button class="btn danger block" data-a="delSession">Abend löschen</button>
+      <button class="btn block" data-a="modalClose">Schliessen</button>`);
+  },
+  textSave() {
+    const v = (document.querySelector('[data-f=txt]') || {}).value?.trim();
+    if (!v) return toast('Bitte Namen eingeben.');
+    const fn = M.onText; closeModal(); fn(v);
+  },
+
+  newGroup() {
+    askText('Neue Gruppe', '', name => {
+      const g = { id: uid(), name, memberIds: [], buyIn: 2000 };
+      D.groups.push(g); save();
+      go({ v: 'group', id: g.id, sub: 'members' });
+    });
+  },
+  openGroup: el => go({ v: 'group', id: el.dataset.id }),
+  gtab(el) { cur().sub = el.dataset.t; render(); },
+  gAddMember(el) { const g = G(cur().id); g.memberIds.push(el.dataset.id); save(); render(); },
+  gRemoveMember(el) {
+    const g = G(cur().id), id = el.dataset.m;
+    if (!confirm(`${mName(id)} aus der Gruppe entfernen?`)) return;
+    g.memberIds = g.memberIds.filter(x => x !== id); save(); render();
+  },
+  gNewMember() {
+    askText('Neues Mitglied', '', name => {
+      const m = { id: uid(), name };
+      D.members.push(m); G(cur().id).memberIds.push(m.id); save(); render();
+    });
+  },
+  gSave() {
+    const g = G(cur().id);
+    const name = document.querySelector('[data-f=gName]').value.trim();
+    const b = parseAmt(document.querySelector('[data-f=gBuy]').value);
+    if (!name) return toast('Name fehlt.');
+    if (b == null || isNaN(b) || b <= 0) return toast('Ungültiger Buy-in-Betrag.');
+    g.name = name; g.buyIn = b; save(); render(); toast('Gespeichert');
+  },
+  delGroup() {
+    const g = G(cur().id);
+    const n = D.sessions.filter(s => s.groupId === g.id).length;
+    if (!confirm(`Gruppe «${g.name}» mit ${n} Abenden endgültig löschen?`)) return;
+    if (n && !confirm('Wirklich? Alle Abende dieser Gruppe gehen verloren.')) return;
+    D.sessions = D.sessions.filter(s => s.groupId !== g.id);
+    D.groups = D.groups.filter(x => x.id !== g.id);
+    save(); setTab('groups');
+  },
+  exportCsv() {
+    const g = G(cur().id);
+    const ss = D.sessions.filter(s => s.groupId === g.id && s.status === 'closed').sort((a, b) => a.start - b.start);
+    if (!ss.length) return toast('Keine abgeschlossenen Abende.');
+    const rows = [['Datum', 'Spieler', 'Buy-ins', 'Rebuys', 'Buy-in Total CHF', 'Endbetrag CHF', 'Netto CHF', 'All-ins', 'All-ins gewonnen', 'Dauer h']];
+    ss.forEach(s => {
+      const st = sessStats(s);
+      st.players.forEach(p => rows.push([new Date(s.start).toLocaleDateString('de-CH'), mName(p.id), p.buys.length, p.rebuys, (p.buy / 100).toFixed(2), p.end == null ? '' : (p.end / 100).toFixed(2), p.net == null ? '' : (p.net / 100).toFixed(2), p.allins, p.allinWins, (st.dur / 3600000).toFixed(2)]));
+    });
+    const csv = '﻿' + rows.map(r => r.map(csvCell).join(';')).join('\r\n');
+    shareOrDownload(csv, `pokerrunde-${g.name.replace(/[^\wäöüÄÖÜ-]+/g, '_')}-${today()}.csv`, 'text/csv');
+  },
+
+  newSession() {
+    const g = G(cur().id);
+    const ids = g.memberIds.filter(id => !isArch(id));
+    if (ids.length < 2) { toast('Mindestens 2 Mitglieder in der Gruppe nötig.'); cur().sub = 'members'; return render(); }
+    M = { sel: new Set(ids), gid: g.id };
+    modal(`<h2>Neuer Abend</h2><label>Start<input type="datetime-local" data-f="nsStart" value="${dtLocal(Date.now())}"></label>
+      <div class="lbl">Teilnehmer</div>${chipsHtml(ids, M.sel, 'chip')}
+      <label class="chk"><input type="checkbox" data-f="nsBuy" checked> Allen den ersten Buy-in (${chf(g.buyIn)}) buchen</label>
+      <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="createSession">Starten</button></div>`);
+  },
+  chip(el) { const id = el.dataset.id; if (M.sel.has(id)) M.sel.delete(id); else M.sel.add(id); el.classList.toggle('on', M.sel.has(id)); },
+  chip1(el) {
+    const id = el.dataset.id;
+    M.opp = M.opp === id ? null : id;
+    el.parentNode.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.id === M.opp));
+  },
+  createSession() {
+    if (M.sel.size < 2) return toast('Mindestens 2 Teilnehmer wählen.');
+    const g = G(M.gid);
+    const v = document.querySelector('[data-f=nsStart]').value;
+    const start = v ? new Date(v).getTime() : Date.now();
+    const s = { id: uid(), groupId: g.id, start: isNaN(start) ? Date.now() : start, end: null, status: 'open', players: sortIds([...M.sel]).map(id => ({ memberId: id, end: null })), events: [] };
+    if (document.querySelector('[data-f=nsBuy]').checked) s.players.forEach(p => addBuy(s, p.memberId, g.buyIn, s.start));
+    D.sessions.push(s); save(); closeModal();
+    go({ v: 'session', id: s.id });
+  },
+  openSession: el => go({ v: 'session', id: el.dataset.id }),
+
+  buy(el) {
+    const s = S(cur().id), g = G(s.groupId), m = el.dataset.m;
+    const e = addBuy(s, m, g.buyIn); save(); render();
+    toast(`${mName(m)}: Buy-in ${chf(g.buyIn)}`, 'Rückgängig', () => { s.events = s.events.filter(x => x.id !== e.id); save(); render(); });
+  },
+  pmenu(el) {
+    const s = S(cur().id), g = G(s.groupId), m = el.dataset.m;
+    const pl = s.players.find(p => p.memberId === m);
+    M = { m };
+    if (pl.left) {
+      modal(`<h2>${esc(mName(m))}</h2><div class="mu">Gegangen um ${fTime(pl.left)}</div>
+        <label>Ausbezahlter Endbetrag (CHF)<input inputmode="decimal" data-f="lAmt" value="${amtIn(pl.end)}"></label>
+        <button class="btn pri block" data-a="leaveSave">Endbetrag speichern</button>
+        <button class="btn block" data-a="rejoin">Kommt zurück an den Tisch</button>
+        <button class="btn block" data-a="modalClose">Schliessen</button>`);
+      return;
+    }
+    const hasEv = s.events.some(e => e.memberId === m || e.opp === m);
+    modal(`<h2>${esc(mName(m))}</h2>
+      <button class="btn pri block" data-a="leave">Geht früher: auszahlen</button>
+      <label>Buy-in mit anderem Betrag (CHF)<input inputmode="decimal" data-f="cAmt" value="${amtIn(g.buyIn)}"></label>
+      <button class="btn block" data-a="buyCustom">Buy-in buchen</button>
+      ${hasEv ? '<div class="note">Spieler hat Einträge und kann nicht aus dem Abend entfernt werden (zuerst Einträge im Verlauf löschen).</div>' : '<button class="btn danger block" data-a="removePlayer">Aus Abend entfernen (irrtümlich erfasst)</button>'}
+      <button class="btn block" data-a="modalClose">Schliessen</button>`);
+  },
+  leave() {
+    const s = S(cur().id), p = sessStats(s).map[M.m];
+    modal(`<h2>${esc(mName(M.m))} geht</h2><div class="mu">Buy-ins: ${p.buys.length}× · ${chf(p.buy)}</div>
+      <label>Endbetrag (Chips beim Gehen, CHF)<input inputmode="decimal" data-f="lAmt" placeholder="0.00"></label>
+      <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="leaveSave">Auszahlen</button></div>`);
+    setTimeout(() => { const i = document.querySelector('[data-f=lAmt]'); if (i) i.focus(); }, 50);
+  },
+  leaveSave() {
+    const s = S(cur().id), pl = s.players.find(p => p.memberId === M.m);
+    const v = parseAmt(document.querySelector('[data-f=lAmt]').value);
+    if (v == null || isNaN(v) || v < 0) return toast('Bitte gültigen Endbetrag eingeben.');
+    const first = !pl.left;
+    pl.end = v; if (first) pl.left = Date.now();
+    save(); closeModal(); render();
+    const net = v - sessStats(s).map[M.m].buy, m = M.m;
+    if (first) toast(`${mName(m)} geht: ${sgn(net)}`, 'Rückgängig', () => { pl.left = null; pl.end = null; save(); render(); });
+  },
+  rejoin() {
+    const s = S(cur().id), pl = s.players.find(p => p.memberId === M.m);
+    if (!confirm(`${mName(M.m)} kommt zurück? Der Endbetrag wird zurückgesetzt, Buy-ins bleiben bestehen.`)) return;
+    pl.left = null; pl.end = null; save(); closeModal(); render();
+  },
+  buyCustom() {
+    const v = parseAmt(document.querySelector('[data-f=cAmt]').value);
+    if (v == null || isNaN(v) || v <= 0) return toast('Ungültiger Betrag.');
+    const s = S(cur().id); addBuy(s, M.m, v); save(); closeModal(); render();
+    toast(`${mName(M.m)}: Buy-in ${chf(v)}`);
+  },
+  removePlayer() {
+    const s = S(cur().id);
+    s.players = s.players.filter(p => p.memberId !== M.m); save(); closeModal(); render();
+  },
+  addPlayers() {
+    const s = S(cur().id), g = G(s.groupId);
+    const ids = g.memberIds.filter(id => !isArch(id) && !s.players.some(p => p.memberId === id));
+    M = { sel: new Set() };
+    modal(`<h2>Spieler stösst dazu</h2>${ids.length ? chipsHtml(ids, M.sel, 'chip') : '<div class="mu">Alle Gruppenmitglieder spielen bereits mit. Neue Mitglieder in der Gruppe unter «Mitglieder» hinzufügen.</div>'}
+      <button class="btn block" data-a="addNewPlayer">+ Neues Mitglied anlegen</button>
+      <label class="chk"><input type="checkbox" data-f="apBuy" checked> Ersten Buy-in (${chf(g.buyIn)}) buchen</label>
+      <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="addPlayersSave">Hinzufügen</button></div>`);
+  },
+  addPlayersSave() {
+    const s = S(cur().id), g = G(s.groupId);
+    const buy = document.querySelector('[data-f=apBuy]').checked;
+    const now = Date.now();
+    M.sel.forEach(id => { s.players.push({ memberId: id, end: null, left: null, joined: now }); if (buy) addBuy(s, id, g.buyIn, now); });
+    save(); closeModal(); render();
+  },
+  addNewPlayer() {
+    askText('Neues Mitglied', '', name => {
+      const s = S(cur().id), g = G(s.groupId), m = { id: uid(), name }, now = Date.now();
+      D.members.push(m); g.memberIds.push(m.id);
+      s.players.push({ memberId: m.id, end: null, left: null, joined: now }); addBuy(s, m.id, g.buyIn, now);
+      save(); render(); toast(`${name} stösst dazu (Buy-in ${chf(g.buyIn)})`);
+    });
+  },
+  allin(el) {
+    const s = S(cur().id), m = el.dataset.m;
+    M = { m, opp: null };
+    const others = s.players.filter(p => !p.left).map(p => p.memberId).filter(id => id !== m);
+    modal(`<h2>All-in: ${esc(mName(m))}</h2><div class="lbl">Gegen wen? (optional, für Duell-Statistik)</div>${chipsHtml(others, new Set(), 'chip1')}
+      <div class="mbtns"><button class="btn blose big" data-a="allinSave" data-won="0">Verloren</button><button class="btn bwin big" data-a="allinSave" data-won="1">Gewonnen</button></div>
+      <button class="btn block" data-a="modalClose">Abbrechen</button>`);
+  },
+  allinSave(el) {
+    const s = S(cur().id), g = G(s.groupId), won = el.dataset.won === '1', m = M.m;
+    s.events.push({ id: uid(), t: Date.now(), type: 'allin', memberId: m, won, opp: M.opp || null });
+    save(); closeModal(); render();
+    if (won) toast(`${mName(m)}: All-in gewonnen`);
+    else toast(`${mName(m)}: All-in verloren`, '+ Rebuy', () => { addBuy(s, m, g.buyIn); save(); render(); toast(`${mName(m)}: Rebuy ${chf(g.buyIn)}`); });
+  },
+  delEvent(el) {
+    const s = S(cur().id);
+    if (!confirm('Eintrag löschen?')) return;
+    s.events = s.events.filter(e => e.id !== el.dataset.id); save(); render();
+  },
+  endSession() { go({ v: 'settle', id: cur().id }); },
+  editEnds() { closeModal(); go({ v: 'settle', id: cur().id }); },
+  settleSave() {
+    const s = S(cur().id);
+    const vals = {};
+    let empty = 0, bad = false;
+    document.querySelectorAll('.endInp').forEach(i => { const v = parseAmt(i.value); if (v == null) empty++; else if (isNaN(v) || v < 0) bad = true; vals[i.dataset.m] = v; });
+    if (bad) return toast('Ungültige Eingabe.');
+    if (empty && !confirm(`${empty} leere${empty > 1 ? ' Felder werden' : 's Feld wird'} als CHF 0.00 gespeichert. Weiter?`)) return;
+    const st = sessStats(s);
+    const sum = Object.values(vals).reduce((a, v) => a + (v || 0), 0);
+    if (sum !== st.pot && !confirm(`Kontrollsumme stimmt nicht (Differenz ${sgn(sum - st.pot)}). Trotzdem speichern?`)) return;
+    s.players.forEach(p => { p.end = vals[p.memberId] || 0; });
+    if (s.status !== 'closed') { s.status = 'closed'; s.end = Date.now(); }
+    save(); stack.pop(); render(); window.scrollTo(0, 0);
+  },
+  reopen() {
+    const s = S(cur().id);
+    if (!confirm('Abend wieder öffnen? Die Endbeträge bleiben als Vorschlag erhalten.')) return;
+    s.status = 'open'; s.end = null; save(); closeModal(); render();
+  },
+  editTimes() {
+    const s = S(cur().id);
+    modal(`<h2>Zeiten ändern</h2><label>Start<input type="datetime-local" data-f="tStart" value="${dtLocal(s.start)}"></label>
+      ${s.end ? `<label>Ende<input type="datetime-local" data-f="tEnd" value="${dtLocal(s.end)}"></label>` : ''}
+      <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="timesSave">Speichern</button></div>`);
+  },
+  timesSave() {
+    const s = S(cur().id);
+    const st = new Date(document.querySelector('[data-f=tStart]').value).getTime();
+    const ei = document.querySelector('[data-f=tEnd]');
+    const en = ei ? new Date(ei.value).getTime() : null;
+    if (isNaN(st) || (ei && isNaN(en))) return toast('Ungültige Zeit.');
+    if (en != null && en <= st) return toast('Ende muss nach dem Start liegen.');
+    const old = s.start;
+    s.events.forEach(e => { if (e.t === old) e.t = st; });
+    s.start = st; if (en != null) s.end = en;
+    save(); closeModal(); render();
+  },
+  delSession() {
+    const s = S(cur().id);
+    if (!confirm(`Abend vom ${fDate(s.start)} endgültig löschen?`)) return;
+    D.sessions = D.sessions.filter(x => x.id !== s.id); save(); closeModal(); back();
+  },
+
+  newMember() {
+    askText('Neues Mitglied', '', name => { D.members.push({ id: uid(), name }); save(); render(); });
+  },
+  memberMenu(el) {
+    const m = D.members.find(x => x.id === el.dataset.id);
+    const used = D.sessions.some(s => s.players.some(p => p.memberId === m.id) || s.events.some(e => e.memberId === m.id || e.opp === m.id));
+    M = { mid: m.id };
+    const groups = D.groups.slice().sort(byName);
+    askText('Mitglied bearbeiten', m.name, name => { m.name = name; save(); render(); },
+      `${groups.length ? `<div class="lbl">Gruppen (antippen zum Zuordnen)</div><div class="chips">${groups.map(g => `<button class="chip ${g.memberIds.includes(m.id) ? 'on' : ''}" data-a="mGroup" data-id="${g.id}">${esc(g.name)}</button>`).join('')}</div>` : ''}
+       <button class="btn block" data-a="mArchive">${m.archived ? 'Reaktivieren' : 'Archivieren'}</button>
+       ${used ? '<div class="note">Löschen nicht möglich, da in Abenden erfasst. Archivieren blendet das Mitglied in allen Auswahlen aus, die Statistik bleibt erhalten.</div>' : '<button class="btn danger block" data-a="mDelete">Löschen</button>'}`);
+  },
+  mGroup(el) {
+    const g = G(el.dataset.id), id = M.mid;
+    if (g.memberIds.includes(id)) g.memberIds = g.memberIds.filter(x => x !== id); else g.memberIds.push(id);
+    el.classList.toggle('on', g.memberIds.includes(id)); save();
+  },
+  mArchive() { const m = D.members.find(x => x.id === M.mid); m.archived = !m.archived; save(); closeModal(); render(); },
+  mDelete() {
+    const m = D.members.find(x => x.id === M.mid);
+    if (!confirm(`${m.name} löschen?`)) return;
+    D.members = D.members.filter(x => x.id !== m.id);
+    D.groups.forEach(g => g.memberIds = g.memberIds.filter(x => x !== m.id));
+    save(); closeModal(); render();
+  },
+
+  async exportJson() {
+    const txt = JSON.stringify({ app: 'pokerrunde', format: 1, exported: new Date().toISOString(), data: D });
+    const ok = await shareOrDownload(txt, `pokerrunde-backup-${today()}.json`, 'application/json');
+    if (ok) { META.lastBackup = Date.now(); saveMeta(); render(); toast('Backup erstellt'); }
+  },
+  importJson() { $('importFile').value = ''; $('importFile').click(); }
+};
+
+$('importFile').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    const d = j.data || j;
+    if (!Array.isArray(d.members) || !Array.isArray(d.groups) || !Array.isArray(d.sessions)) throw new Error('Keine gültige Pokerrunde-Sicherung.');
+    if (!confirm(`Backup mit ${d.members.length} Mitgliedern, ${d.groups.length} Gruppen und ${d.sessions.length} Abenden importieren? Die aktuellen Daten werden überschrieben.`)) return;
+    D = { members: d.members, groups: d.groups, sessions: d.sessions };
+    await save(); setTab('data'); toast('Backup importiert');
+  } catch (e) { alert('Import fehlgeschlagen: ' + e.message); }
+});
+
+document.addEventListener('click', ev => {
+  if (ev.target === $('modal')) return closeModal();
+  const el = ev.target.closest('[data-a]'); if (!el) return;
+  const fn = A[el.dataset.a]; if (fn) fn(el);
+});
+document.addEventListener('input', ev => { if (ev.target.classList.contains('endInp')) updateSettleSum(); });
+
+setInterval(() => {
+  const c = cur(); if (c.v !== 'session') return;
+  const s = S(c.id); if (!s || s.status !== 'open') return;
+  const d = document.querySelector('[data-dur]'); if (d) d.textContent = fDur(Date.now() - s.start);
+}, 30000);
+
+window.addEventListener('resize', measure);
+if (window.ResizeObserver) { const ro = new ResizeObserver(measure); ro.observe($('hdr')); ro.observe($('ftr')); }
+
+(async function init() {
+  try {
+    const d = await Storage.get('data'); if (d) D = d;
+    const m = await Storage.get('meta'); if (m) META = m;
+  } catch (e) { toast('Speicher nicht verfügbar: ' + e); }
+  render();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
