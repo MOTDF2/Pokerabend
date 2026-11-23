@@ -141,7 +141,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.13';
+const APP_VERSION = '1.14';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -579,9 +579,9 @@ function resultHtml(s) {
   h += `</div>`;
   const tt = nightTitles(st);
   if (tt) h += `<h3>Titel des Abends<button class="ib" data-a="titleInfo" data-k="night" aria-label="Erklärung">ⓘ</button></h3><div class="card list">${tt}</div>`;
-  h += `<h3>Details</h3><div class="card tw"><table><tr><th>Spieler</th><th>Rebuys</th><th>All-ins</th><th>gewonnen</th><th>CHF/h</th><th>bis Rebuy</th></tr>`;
+  h += `<h3>Details</h3><div class="card tw"><table><tr><th>Spieler</th><th>Rebuys</th><th>All-ins</th><th>All-in Win</th><th>gewonnen</th><th>CHF/h</th><th>bis Rebuy</th></tr>`;
   P.forEach(p => {
-    h += `<tr><td>${esc(mName(p.id))}</td><td>${p.rebuys}</td><td>${p.allins}</td><td>${pct(p.allinWins, p.allins)}</td><td class="${cls(p.net)}">${p.net != null && p.hours > 0 ? sgn(Math.round(p.net / p.hours)) : '–'}</td><td>${p.ttr ? fDur(p.ttr) : '–'}</td></tr>`;
+    h += `<tr><td>${esc(mName(p.id))}</td><td>${p.rebuys}</td><td>${p.allins}</td><td>${p.allinWins}</td><td>${pct(p.allinWins, p.allins)}</td><td class="${cls(p.net)}">${p.net != null && p.hours > 0 ? sgn(Math.round(p.net / p.hours)) : '–'}</td><td>${p.ttr ? fDur(p.ttr) : '–'}</td></tr>`;
   });
   h += `</table></div>`;
   h += `<button class="btn pri block big" data-a="exportPdf">📄 Als PDF exportieren</button>`;
@@ -909,10 +909,10 @@ function sessionPdf(s) {
     tt.forEach(x => { d.need(16); d.text(54, d.y, x.name, { size: 10, bold: true }); d.text(180, d.y, x.who, { size: 10 }); d.text(545, d.y, x.val, { size: 10, align: 'right' }); d.y -= 16; });
   }
   d.heading('Details');
-  const cols = [{ h: 'Spieler', w: 130 }, { h: 'Rebuys', w: 55 }, { h: 'All-ins', w: 55 }, { h: 'gewonnen', w: 65 }];
-  if (!s.noTime) cols.push({ h: 'am Tisch', w: 65 }, { h: 'CHF/h', w: 60 }, { h: 'bis Rebuy', w: 65 });
+  const cols = [{ h: 'Spieler', w: 110 }, { h: 'Rebuys', w: 50 }, { h: 'All-ins', w: 50 }, { h: 'All-in Win', w: 60 }, { h: 'gewonnen', w: 60 }];
+  if (!s.noTime) cols.push({ h: 'am Tisch', w: 60 }, { h: 'CHF/h', w: 50 }, { h: 'bis Rebuy', w: 55 });
   d.table(cols, P.map(p => {
-    const r = [mName(p.id), String(p.rebuys), String(p.allins), pct(p.allinWins, p.allins)];
+    const r = [mName(p.id), String(p.rebuys), String(p.allins), String(p.allinWins), pct(p.allinWins, p.allins)];
     if (!s.noTime) r.push(p.hours > 0 ? fDur(p.hours * 3600000) : '-', { t: p.net != null && p.hours > 0 ? sgn(Math.round(p.net / p.hours)) : '-', color: nc(p.net) }, p.ttr ? fDur(p.ttr) : '-');
     return r;
   }));
