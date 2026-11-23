@@ -112,6 +112,13 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 .card.gone{opacity:.75;background:var(--chip)}
 .sum>div{flex:1}.sum b{font-size:15px}
 .info{font:inherit;font-size:13px;border:1px solid var(--bd);background:var(--card);color:var(--pri);border-radius:12px;padding:1px 9px;margin-left:6px;cursor:pointer;text-transform:none;letter-spacing:0;vertical-align:1px}
+.ibox{background:#e0f2fe;color:#0c4a6e;border-radius:10px;padding:8px 11px;margin:6px 0 10px;font-size:13px;line-height:1.4;text-transform:none;letter-spacing:0;font-weight:400}
+@media (prefers-color-scheme:dark){.ibox{background:#0c2d40;color:#bae6fd}}
+.ib{font:inherit;font-size:13px;line-height:1;border:0;background:none;color:var(--pri);padding:2px 4px;margin-left:2px;cursor:pointer;vertical-align:0}
+.card.pc{padding:8px 8px 8px 12px;margin-bottom:6px}
+.sbtn{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:9px;padding:9px 10px;min-height:38px;color:#fff;cursor:pointer;white-space:nowrap}
+.sbtn.pri{background:var(--pri)}.sbtn.warn{background:#b45309}.sbtn:active{opacity:.75}
+.pc .row{gap:6px}.pc .ttl{font-size:15px}
 .note{font-size:12px;color:var(--mu);margin:6px 2px}
 </style>
 </head>
@@ -132,7 +139,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.7';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -413,7 +420,7 @@ const VIEWS = {
   settle(c) {
     const s = S(c.id); if (!s) return null;
     const st = sessStats(s);
-    let h = `<div class="note">Endbetrag = Chips bzw. Geld, das der Spieler am Schluss vor sich hat (in CHF).</div>`;
+    let h = `<h3>Endbeträge erfassen${ib('endAmount')}</h3>`;
     st.players.slice().sort((a, b) => mName(a.id).localeCompare(mName(b.id), 'de')).forEach(p => {
       h += `<div class="card"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}</div><div class="mu">Buy-ins: ${p.buys.length}× · ${chf(p.buy)}${p.left ? ` · gegangen ${fTime(p.left)}` : ''}</div></div>
         <div style="width:120px"><input inputmode="decimal" class="endInp" data-m="${p.id}" value="${amtIn(p.end)}" placeholder="0.00"></div></div></div>`;
@@ -439,11 +446,10 @@ const VIEWS = {
 
   data() {
     const n = D.sessions.length;
-    let h = `<h3>Datensicherung</h3><div class="card">
+    let h = `<h3>Datensicherung${ib('backup')}</h3><div class="card">
       <div>Letzte Sicherung: <b>${META.lastBackup ? fDate(META.lastBackup) + ', ' + fTime(META.lastBackup) : 'noch nie'}</b></div>
       <button class="btn pri block" data-a="exportJson">Backup exportieren (JSON)</button>
-      <button class="btn block" data-a="importJson">Backup importieren</button>
-      <div class="note">Die Daten liegen nur auf diesem Gerät. Safari und die installierte Homescreen-App haben getrennte Speicher: Backup und Import immer in der Homescreen-App machen.</div></div>
+      <button class="btn block" data-a="importJson">Backup importieren</button></div>
       <h3>Bestand</h3><div class="card">${D.members.length} Mitglieder · ${D.groups.length} Gruppen · ${n} Abende</div>
       <h3>Info</h3><div class="card"><div>Pokerrunde · Version ${APP_VERSION}</div><div class="mu">Cash Game · offline · ohne Login</div></div>`;
     return { title: 'Daten', html: h };
@@ -469,7 +475,7 @@ function nightsHtml(g) {
 }
 
 function groupMembersHtml(g) {
-  let h = `<div class="card list">`;
+  let h = `<h3>Mitglieder der Gruppe${ib('gmembers')}</h3><div class="card list">`;
   if (!g.memberIds.length) h += `<div class="li mu">Noch keine Mitglieder in dieser Gruppe.</div>`;
   sortIds(g.memberIds).forEach(id => {
     h += `<div class="li"><span class="grow"><b>${esc(mName(id))}</b>${isArch(id) ? ' <span class="badge">archiviert</span>' : ''}</span><button class="btn danger" data-a="gRemoveMember" data-m="${id}">Entfernen</button></div>`;
@@ -478,7 +484,6 @@ function groupMembersHtml(g) {
   const others = D.members.filter(m => !m.archived && !g.memberIds.includes(m.id)).map(m => m.id);
   h += `<h3>Hinzufügen</h3>${others.length ? chipsHtml(others, new Set(), 'gAddMember') : '<div class="mu">Alle aktiven Mitglieder sind bereits in der Gruppe.</div>'}`;
   h += `<button class="btn block" data-a="gNewMember">+ Neues Mitglied anlegen und hinzufügen</button>`;
-  h += `<div class="note">Entfernte Mitglieder bleiben in vergangenen Abenden und in der Statistik erhalten.</div>`;
   return h;
 }
 
@@ -494,17 +499,18 @@ function liveHtml(s) {
   const g = G(s.groupId), st = sessStats(s);
   const act = s.players.filter(p => !p.left), gone = s.players.filter(p => p.left);
   const paid = gone.reduce((a, p) => a + (p.end || 0), 0);
-  let h = `<div class="sum"><div><div class="mu">Pot</div><b class="num">${NF.format(st.pot / 100)}</b></div><div><div class="mu">Am Tisch</div><b class="num">${NF.format((st.pot - paid) / 100)}</b></div>${s.noTime ? '' : `<div><div class="mu">Dauer</div><b data-dur>${fDur(st.dur)}</b></div>`}<div><div class="mu">Spieler</div><b>${act.length}${gone.length ? `<span class="mu"> +${gone.length}</span>` : ''}</b></div></div>`;
+  const buyLbl = g.buyIn % 100 === 0 ? String(g.buyIn / 100) : NF.format(g.buyIn / 100);
+  let h = `<div class="sum" data-host><div><div class="mu">Pot</div><b class="num">${NF.format(st.pot / 100)}</b></div><div><div class="mu">Am Tisch${ib('pot')}</div><b class="num">${NF.format((st.pot - paid) / 100)}</b></div>${s.noTime ? '' : `<div><div class="mu">Dauer</div><b data-dur>${fDur(st.dur)}</b></div>`}<div><div class="mu">Spieler</div><b>${act.length}${gone.length ? `<span class="mu"> +${gone.length}</span>` : ''}</b></div></div>`;
   act.forEach(pl => {
     const p = st.map[pl.memberId];
-    h += `<div class="card"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}${pl.joined && !s.noTime ? ` <span class="badge">ab ${fTime(pl.joined)}</span>` : ''}</div>
-      <div class="mu">${p.buys.length}× Buy-in · ${chf(p.buy)}${p.allins ? ` · All-in ${p.allinWins}/${p.allins}` : ''}</div></div>
-      <button class="ibtn" data-a="pmenu" data-m="${p.id}" aria-label="Optionen">⋯</button></div>
-      <div class="btns"><button class="btn pri" data-a="buy" data-m="${p.id}">+ ${p.buys.length ? 'Rebuy' : 'Buy-in'} ${NF.format(g.buyIn / 100)}</button>
-      <button class="btn warn" data-a="allin" data-m="${p.id}">All-in</button></div></div>`;
+    h += `<div class="card pc"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}${pl.joined && !s.noTime ? ` <span class="badge">ab ${fTime(pl.joined)}</span>` : ''}</div>
+      <div class="mu">${p.buys.length}× · ${NF.format(p.buy / 100)}${p.allins ? ` · All-in ${p.allinWins}/${p.allins}` : ''}</div></div>
+      <button class="sbtn pri" data-a="buy" data-m="${p.id}" aria-label="${p.buys.length ? 'Rebuy' : 'Buy-in'}">+ ${buyLbl}</button>
+      <button class="sbtn warn" data-a="allin" data-m="${p.id}">All-in</button>
+      <button class="ibtn" data-a="pmenu" data-m="${p.id}" aria-label="Optionen">⋯</button></div></div>`;
   });
   h += `<button class="btn block" data-a="addPlayers">+ Spieler stösst dazu</button>`;
-  if (s.noTime) h = `<div class="banner ok">Nachträglich erfasster Abend ohne Uhrzeiten: Buy-ins und All-ins antippen, dann Endbeträge erfassen.</div>` + h;
+  if (s.noTime) h = `<div class="mu" style="margin:0 2px 8px">Nachgetragener Abend${ib('noTime')}</div>` + h;
   if (gone.length) {
     h += `<h3>Gegangen</h3>`;
     gone.forEach(pl => {
@@ -543,7 +549,7 @@ function resultHtml(s) {
   const st = sessStats(s);
   const P = st.players.slice().sort((a, b) => (b.net ?? -1e15) - (a.net ?? -1e15));
   let h = `<div class="tiles"><div class="tile"><span class="mu">Pot</span><b class="num">${chf(st.pot)}</b></div>${st.dur == null ? `<div class="tile"><span class="mu">Spieler</span><b>${st.players.length}</b></div>` : `<div class="tile"><span class="mu">Dauer</span><b>${fDur(st.dur)}</b></div>`}</div>`;
-  if (s.noTime) h += `<div class="note">Nachgetragen ohne Uhrzeiten: Dauer, CHF/h und Zeit bis Rebuy entfallen.</div>`;
+  if (s.noTime) h += `<div class="mu" style="margin:0 2px 8px">Nachgetragener Abend${ib('noTime')}</div>`;
   if (st.diff !== 0) h += `<div class="banner err">⚠️ Kontrollsumme stimmt nicht: Endbeträge ${chf(st.endSum)}, Buy-ins ${chf(st.pot)} (Differenz ${sgn(st.diff)}). <u data-a="editEnds">Korrigieren</u></div>`;
   h += `<h3>Resultat</h3><div class="card tw"><table><tr><th>Spieler</th><th>Buy-in</th><th>Ende</th><th>Netto</th><th>ROI</th></tr>`;
   P.forEach(p => {
@@ -551,11 +557,11 @@ function resultHtml(s) {
   });
   h += `</table></div>`;
   const tx = settleTx(P.map(p => ({ id: p.id, net: p.net || 0 })));
-  h += `<h3>Ausgleich</h3><div class="card list">`;
+  h += `<h3>Ausgleich${ib('settle')}</h3><div class="card list">`;
   h += tx.length ? tx.map(t => `<div class="li"><span class="grow">${esc(mName(t.from))} → <b>${esc(mName(t.to))}</b></span><span class="num">${chf(t.v)}</span></div>`).join('') : `<div class="li mu">Kein Ausgleich nötig.</div>`;
-  h += `</div><div class="note">Gilt, wenn die Buy-ins nicht bar in eine gemeinsame Kasse bezahlt wurden.</div>`;
+  h += `</div>`;
   const tt = nightTitles(st);
-  if (tt) h += `<h3>Titel des Abends<button class="info" data-a="titleInfo" data-k="night" aria-label="Erklärung">ⓘ Info</button></h3><div class="card list">${tt}</div>`;
+  if (tt) h += `<h3>Titel des Abends<button class="ib" data-a="titleInfo" data-k="night" aria-label="Erklärung">ⓘ</button></h3><div class="card list">${tt}</div>`;
   h += `<h3>Details</h3><div class="card tw"><table><tr><th>Spieler</th><th>Rebuys</th><th>All-ins</th><th>gewonnen</th><th>CHF/h</th><th>bis Rebuy</th></tr>`;
   P.forEach(p => {
     h += `<tr><td>${esc(mName(p.id))}</td><td>${p.rebuys}</td><td>${p.allins}</td><td>${pct(p.allinWins, p.allins)}</td><td class="${cls(p.net)}">${p.net != null && p.hours > 0 ? sgn(Math.round(p.net / p.hours)) : '–'}</td><td>${p.ttr ? fDur(p.ttr) : '–'}</td></tr>`;
@@ -582,7 +588,7 @@ function statsHtml(g) {
 
   if (X.ss.length >= 2) h += `<h3>Verlauf kumuliert (CHF)</h3><div class="card">${lineChart(X)}</div>`;
 
-  h += `<h3>Rangliste</h3><div class="card tw"><table><tr><th>Spieler</th><th>Abende</th><th>Bilanz</th><th>Ø/Abend</th><th>Siegquote</th><th>ROI</th><th>CHF/h</th><th>Streuung</th><th>Max +</th><th>Max −</th><th>Serie</th><th>Rebuys/Abend</th><th>All-in %</th><th>Ø bis Rebuy</th></tr>`;
+  h += `<h3>Rangliste${ib('rank')}</h3><div class="card tw"><table><tr><th>Spieler</th><th>Abende</th><th>Bilanz</th><th>Ø/Abend</th><th>Siegquote</th><th>ROI</th><th>CHF/h</th><th>Streuung</th><th>Max +</th><th>Max −</th><th>Serie</th><th>Rebuys/Abend</th><th>All-in %</th><th>Ø bis Rebuy</th></tr>`;
   X.arr.forEach(q => {
     h += `<tr><td>${esc(mName(q.id))}</td><td>${q.nights}</td><td class="${cls(q.total)}"><b>${sgn(q.total)}</b></td><td class="${cls(q.avg)}">${sgn(Math.round(q.avg))}</td>
       <td>${pct(q.wins, q.nights)}</td><td>${q.roi == null ? '–' : pctS(q.roi)}</td><td class="${cls(q.perH)}">${q.perH == null ? '–' : sgn(Math.round(q.perH))}</td>
@@ -590,30 +596,47 @@ function statsHtml(g) {
       <td class="${q.streak ? (q.streak.sg > 0 ? 'pos' : 'neg') : ''}">${q.streak ? q.streak.n + '× ' + (q.streak.sg > 0 ? 'Plus' : 'Minus') : '–'}</td>
       <td>${(Math.round(q.rebuys / q.nights * 10) / 10).toLocaleString('de-CH')}</td><td>${pct(q.allinWins, q.allins)}${q.allins ? ` <span class="mu">(${q.allins})</span>` : ''}</td><td>${q.ttrAvg ? fDur(q.ttrAvg) : '–'}</td></tr>`;
   });
-  h += `</table></div><div class="note">Siegquote = Anteil Abende im Plus. Streuung = Standardabweichung des Nettos pro Abend (CHF). Serie = aktuelle Plus- bzw. Minusserie.</div>`;
+  h += `</table></div>`;
 
   const A = X.arr;
   const t = groupTitlesData(X).map(x => `<div class="li"><span class="ico">${x.icon}</span><span class="grow"><b>${esc(x.name)}</b><div class="mu">${esc(x.who)}</div></span><span class="num">${x.val}</span></div>`).join('');
-  if (t) h += `<h3>Titel (alle Abende)<button class="info" data-a="titleInfo" data-k="group" aria-label="Erklärung">ⓘ Info</button></h3><div class="card list">${t}</div>`;
+  if (t) h += `<h3>Titel (alle Abende)<button class="ib" data-a="titleInfo" data-k="group" aria-label="Erklärung">ⓘ</button></h3><div class="card list">${t}</div>`;
 
   const hasDuels = Object.keys(X.beats).length > 0;
   if (hasDuels) {
-    h += `<h3>Duelle (All-ins mit Gegner)</h3><div class="card tw"><table><tr><th>Spieler</th><th>Knockouts</th><th>Nemesis</th><th>Lieblingsopfer</th></tr>`;
+    h += `<h3>Duelle (All-ins mit Gegner)${ib('duels')}</h3><div class="card tw"><table><tr><th>Spieler</th><th>Knockouts</th><th>Nemesis</th><th>Lieblingsopfer</th></tr>`;
     A.forEach(q => {
       const x = duelData(X, q);
       h += `<tr><td>${esc(mName(q.id))}</td><td>${q.ko}</td><td>${esc(x.nem)}</td><td>${esc(x.vic)}</td></tr>`;
     });
     h += `</table></div>`;
-    h += `<h3>Direktduelle: Zeile schlägt Spalte</h3><div class="card tw"><table><tr><th></th>${A.map(o => `<th>${esc(mName(o.id))}</th>`).join('')}</tr>`;
+    h += `<h3>Direktduelle${ib('matrix')}</h3><div class="card tw"><table><tr><th></th>${A.map(o => `<th>${esc(mName(o.id))}</th>`).join('')}</tr>`;
     A.forEach(r => {
       h += `<tr><td>${esc(mName(r.id))}</td>${A.map(c => r.id === c.id ? '<td class="mu">–</td>' : `<td>${(X.beats[r.id] || {})[c.id] || '·'}</td>`).join('')}</tr>`;
     });
-    h += `</table></div><div class="note">Zählt gewonnene All-in-Duelle, bei denen der Gegner erfasst wurde. Knockout = Gegner hat sein All-in gegen diesen Spieler verloren.</div>`;
+    h += `</table></div>`;
   } else {
-    h += `<div class="note">Duell-Statistiken (Nemesis, Knockouts) erscheinen, sobald bei All-ins ein Gegner erfasst wird.</div>`;
+    h += `<h3>Duelle${ib('duels')}</h3><div class="card mu">Noch keine Daten: bei All-ins den Gegner erfassen.</div>`;
   }
   return h;
 }
+
+const HELP = {
+  endAmount: 'Endbetrag = Chips bzw. Geld, das ein Spieler am Schluss vor sich hat (CHF). Die Summe aller Endbeträge muss der Summe der Buy-ins entsprechen.',
+  backup: 'Die Daten liegen nur auf diesem Gerät. Safari und Homescreen-App speichern getrennt: Backup und Import immer in der Homescreen-App.',
+  gmembers: 'Entfernte Mitglieder bleiben in vergangenen Abenden und in der Statistik erhalten.',
+  noTime: 'Nachgetragen ohne Uhrzeiten: Buy-ins und All-ins antippen, dann Endbeträge erfassen. Dauer, CHF/h und Zeit bis Rebuy entfallen.',
+  pot: 'Pot: alle Buy-ins. Am Tisch: Pot minus das, was gegangenen Spielern bereits ausbezahlt wurde.',
+  settle: 'Zeigt, wer wem wie viel zahlt. Gilt, wenn die Buy-ins nicht bar in eine gemeinsame Kasse bezahlt wurden.',
+  rank: 'Siegquote: Anteil Abende im Plus. ROI: Netto im Verhältnis zu den Buy-ins. CHF/h: Netto pro Stunde am Tisch. Streuung: wie stark die Ergebnisse schwanken (Standardabweichung, CHF). Serie: aktuelle Plus- oder Minusserie.',
+  duels: 'Nemesis: Spieler, gegen den man die meisten All-in-Duelle verloren hat. Lieblingsopfer: gegen wen man die meisten gewonnen hat. Knockout: ein Gegner verliert sein All-in gegen diesen Spieler. Zählt nur, wenn beim All-in der Gegner erfasst wurde.',
+  matrix: 'Zahl = gewonnene All-in-Duelle des Spielers in der Zeile gegen den Spieler in der Spalte.',
+  noRemove: 'Der Spieler hat bereits Einträge. Zum Entfernen zuerst seine Einträge im Verlauf löschen.',
+  times: 'Liegen Einträge ausserhalb der neuen Zeit, werden sie anteilig verschoben. Alle Statistiken rechnen danach mit den neuen Zeiten.',
+  noDelete: 'Mitglied ist in Abenden erfasst und kann nicht gelöscht werden. Archivieren blendet es in allen Auswahlen aus, die Statistik bleibt.',
+  ties: 'Bei Gleichstand erhalten alle Betroffenen den Titel. Ein Titel erscheint nur, wenn die Bedingung erfüllt ist.'
+};
+const ib = k => `<button class="ib" data-a="help" data-k="${k}" aria-label="Info">ⓘ</button>`;
 
 const TITLE_INFO = {
   night: [
@@ -1034,7 +1057,7 @@ const A = {
       <button class="btn pri block" data-a="leave">Geht früher: auszahlen</button>
       <label>Buy-in mit anderem Betrag (CHF)<input inputmode="decimal" data-f="cAmt" value="${amtIn(g.buyIn)}"></label>
       <button class="btn block" data-a="buyCustom">Buy-in buchen</button>
-      ${hasEv ? '<div class="note">Spieler hat Einträge und kann nicht aus dem Abend entfernt werden (zuerst Einträge im Verlauf löschen).</div>' : '<button class="btn danger block" data-a="removePlayer">Aus Abend entfernen (irrtümlich erfasst)</button>'}
+      ${hasEv ? `<div class="mu" style="margin:8px 2px">Entfernen nicht möglich${ib('noRemove')}</div>` : '<button class="btn danger block" data-a="removePlayer">Aus Abend entfernen (irrtümlich erfasst)</button>'}
       <button class="btn block" data-a="modalClose">Schliessen</button>`);
   },
   leave() {
@@ -1143,7 +1166,7 @@ const A = {
     }
     modal(`<h2>Zeiten ändern</h2><label>Start<input type="datetime-local" data-f="tStart" value="${dtLocal(s.start)}"></label>
       ${s.end ? `<label>Ende<input type="datetime-local" data-f="tEnd" value="${dtLocal(s.end)}"></label>` : ''}
-      <div class="note">Liegen erfasste Einträge (Buy-ins, All-ins, Kommen/Gehen) ausserhalb der neuen Zeit, werden sie proportional in den neuen Zeitraum verschoben. Alle Statistiken rechnen danach mit den neuen Zeiten.</div>
+      <div class="mu" style="margin:4px 2px">Was passiert mit den Einträgen?${ib('times')}</div>
       <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="timesSave">Speichern</button></div>`);
   },
   timesSave() {
@@ -1190,7 +1213,7 @@ const A = {
     askText('Mitglied bearbeiten', m.name, name => { m.name = name; save(); render(); },
       `${groups.length ? `<div class="lbl">Gruppen (antippen zum Zuordnen)</div><div class="chips">${groups.map(g => `<button class="chip ${g.memberIds.includes(m.id) ? 'on' : ''}" data-a="mGroup" data-id="${g.id}">${esc(g.name)}</button>`).join('')}</div>` : ''}
        <button class="btn block" data-a="mArchive">${m.archived ? 'Reaktivieren' : 'Archivieren'}</button>
-       ${used ? '<div class="note">Löschen nicht möglich, da in Abenden erfasst. Archivieren blendet das Mitglied in allen Auswahlen aus, die Statistik bleibt erhalten.</div>' : '<button class="btn danger block" data-a="mDelete">Löschen</button>'}`);
+       ${used ? `<div class="mu" style="margin:8px 2px">Löschen nicht möglich${ib('noDelete')}</div>` : '<button class="btn danger block" data-a="mDelete">Löschen</button>'}`);
   },
   mGroup(el) {
     const g = G(el.dataset.id), id = M.mid;
@@ -1206,11 +1229,19 @@ const A = {
     save(); closeModal(); render();
   },
 
+  help(el) {
+    const k = el.dataset.k, host = el.closest('[data-host]') || el.parentElement;
+    const nx = host.nextElementSibling;
+    if (nx && nx.classList.contains('ibox') && nx.dataset.k === k) { nx.remove(); return; }
+    const box = document.createElement('div');
+    box.className = 'ibox'; box.dataset.k = k; box.textContent = HELP[k];
+    host.insertAdjacentElement('afterend', box);
+  },
   titleInfo(el) {
     const k = el.dataset.k;
     modal(`<h2>${k === 'night' ? 'Titel des Abends' : 'Titel über alle Abende'}</h2><div class="card list">` +
       TITLE_INFO[k].map(([i, n, d]) => `<div class="li"><span class="ico">${i}</span><span class="grow"><b>${n}</b><div class="mu">${d}</div></span></div>`).join('') +
-      `</div><div class="note">Bei Gleichstand erhalten alle Betroffenen den Titel. Ein Titel erscheint nur, wenn die Bedingung erfüllt ist.</div><button class="btn block" data-a="modalClose">Schliessen</button>`);
+      `</div><div class="mu" style="margin:4px 2px">Gleichstand${ib('ties')}</div><button class="btn block" data-a="modalClose">Schliessen</button>`);
   },
   exportPdf() {
     const s = S(cur().id), g = G(s.groupId);
