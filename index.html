@@ -141,7 +141,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.14';
+const APP_VERSION = '1.15';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -460,7 +460,8 @@ const VIEWS = {
       <button class="btn pri block" data-a="exportJson">Backup exportieren (JSON)</button>
       <button class="btn block" data-a="importJson">Backup importieren</button></div>
       <h3>Bestand</h3><div class="card">${D.members.length} Mitglieder · ${D.groups.length} Gruppen · ${n} Abende</div>
-      <h3>Info</h3><div class="card"><div>Pokerrunde · Version ${APP_VERSION}</div><div class="mu">Cash Game · offline · ohne Login</div></div>`;
+      <h3>Info${ib('update')}</h3><div class="card"><div>Pokerrunde · Version ${APP_VERSION}</div><div class="mu">Cash Game · offline · ohne Login</div>
+      <button class="btn block" data-a="checkUpdate">Nach Update suchen</button></div>`;
     return { title: 'Daten', html: h };
   }
 };
@@ -659,6 +660,7 @@ const HELP = {
   noDelete: 'Mitglied ist in Abenden erfasst und kann nicht gelöscht werden. Archivieren blendet es in allen Auswahlen aus, die Statistik bleibt.',
   bust: 'Raus = keine Chips mehr. Wer jemanden rauswirft, erhält einen Knockout, egal wer All-in ging. Noch Chips = der Verlierer hatte mehr Chips und bleibt im Spiel. Für die Duell-Statistik zählt jedes gewonnene oder verlorene All-in. «Gegner raus» braucht einen gewählten Gegner.',
   pause: 'Während der Pause steht die Spielzeit still. Dauer, CHF/h, Zeit am Tisch und Zeit bis Rebuy werden ohne Pausen gerechnet. Buy-ins und All-ins können trotzdem erfasst werden.',
+  update: 'Neue Versionen erscheinen beim nächsten Öffnen der App. Nach einem Upload auf GitHub kann es einige Minuten dauern, bis GitHub die neue Version ausliefert. «Nach Update suchen» prüft sofort und lädt die neue Version. Die Daten bleiben dabei erhalten.',
   ties: 'Bei Gleichstand erhalten alle Betroffenen den Titel. Ein Titel erscheint nur, wenn die Bedingung erfüllt ist.'
 };
 const ib = k => `<button class="ib" data-a="help" data-k="${k}" aria-label="Info">ⓘ</button>`;
@@ -1292,6 +1294,25 @@ const A = {
       TITLE_INFO[k].map(([i, n, d]) => `<div class="li"><span class="ico">${i}</span><span class="grow"><b>${n}</b><div class="mu">${d}</div></span></div>`).join('') +
       `</div><div class="mu" style="margin:4px 2px">Gleichstand${ib('ties')}</div><button class="btn block" data-a="modalClose">Schliessen</button>`);
   },
+  async checkUpdate() {
+    toast('Suche Update …');
+    try {
+      const res = await fetch('index.html?v=' + Date.now(), { cache: 'no-store' });
+      const html = await res.text();
+      const m = html.match(/APP_VERSION = '([\d.]+)'/);
+      const remote = m ? m[1] : null;
+      if (!remote) return toast('Update-Prüfung nicht möglich (offline?).');
+      if (remote === APP_VERSION) return toast(`Version ${APP_VERSION} ist aktuell.`);
+      if ('serviceWorker' in navigator) {
+        const r = await navigator.serviceWorker.getRegistration();
+        if (r) await r.update();
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      toast(`Version ${remote} gefunden, lade neu …`);
+      setTimeout(() => location.reload(), 800);
+    } catch (e) { toast('Update-Prüfung nicht möglich (offline?).'); }
+  },
   exportPdf() {
     const s = S(cur().id), g = G(s.groupId);
     closeModal();
@@ -1353,7 +1374,7 @@ if (window.ResizeObserver) { const ro = new ResizeObserver(measure); ro.observe(
   } catch (e) { toast('Speicher nicht verfügbar: ' + e); }
   render();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
 })();
 </script>
 </body>

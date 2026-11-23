@@ -1,8 +1,8 @@
-const CACHE_NAME = 'pokerrunde-v15';
+const CACHE_NAME = 'pokerrunde-v16';
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -18,11 +18,11 @@ self.addEventListener('fetch', e => {
   if (url.origin !== location.origin) return;
   const networkFirst = req.mode === 'navigate' || /\/(index\.html|manifest\.json)?$/.test(url.pathname) || url.pathname.endsWith('.json') || url.pathname.endsWith('.html');
   if (networkFirst) {
-    e.respondWith(fetch(req).then(res => {
+    e.respondWith(fetch(req, { cache: 'no-store' }).then(res => {
       const copy = res.clone();
-      caches.open(CACHE_NAME).then(c => c.put(req, copy));
+      if (res.ok) caches.open(CACHE_NAME).then(c => c.put(req, copy));
       return res;
-    }).catch(() => caches.match(req).then(r => r || caches.match('./index.html'))));
+    }).catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('./index.html'))));
   } else {
     e.respondWith(caches.match(req).then(r => r || fetch(req).then(res => {
       const copy = res.clone();
