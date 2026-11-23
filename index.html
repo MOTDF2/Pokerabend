@@ -70,6 +70,7 @@ h3{font-size:12px;margin:18px 2px 8px;color:var(--mu);text-transform:uppercase;l
 .hidden{display:none!important}
 .sheet{background:var(--bg);width:100%;max-width:720px;max-height:88%;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:16px 16px 0 0;
  padding:16px calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+select{font:inherit;font-size:16px;width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);margin-top:4px}
 input[type=text],input[type=date],input[type=datetime-local],input[inputmode]{font:inherit;font-size:16px;width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);-webkit-appearance:none;appearance:none}
 label{display:block;margin:10px 0;font-size:13px;color:var(--mu)}
 label input{margin-top:4px}
@@ -140,7 +141,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.12';
+const APP_VERSION = '1.13';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -287,8 +288,8 @@ function nightTitles(st) {
   return nightTitlesData(st).map(x => `<div class="li"><span class="ico">${x.icon}</span><span class="grow"><b>${esc(x.name)}</b><div class="mu">${esc(x.who)}</div></span><span class="num">${x.val}</span></div>`).join('');
 }
 
-function groupStats(g) {
-  const ss = D.sessions.filter(s => s.groupId === g.id && s.status === 'closed').sort((a, b) => a.start - b.start);
+function groupStats(g, until) {
+  const ss = D.sessions.filter(s => s.groupId === g.id && s.status === 'closed' && (until == null || s.start <= until)).sort((a, b) => a.start - b.start);
   const P = {}, beats = {}, cum = {}, series = [];
   const get = id => P[id] || (P[id] = { id, nights: 0, nets: [], total: 0, buy: 0, rebuys: 0, allins: 0, allinWins: 0, hours: 0, timedNet: 0, ttr: [], ko: 0, wins: 0 });
   let durSum = 0, durN = 0, plSum = 0, potSum = 0;
@@ -414,7 +415,7 @@ const VIEWS = {
     const segs = [['nights', 'Abende'], ['stats', 'Statistik'], ['members', 'Mitglieder'], ['settings', 'Einstell.']];
     let h = `<div class="seg">${segs.map(([k, l]) => `<button class="${sub === k ? 'on' : ''}" data-a="gtab" data-t="${k}">${l}</button>`).join('')}</div>`;
     if (sub === 'nights') h += nightsHtml(g);
-    else if (sub === 'stats') h += statsHtml(g);
+    else if (sub === 'stats') h += statsHtml(g, c);
     else if (sub === 'members') h += groupMembersHtml(g);
     else h += groupSettingsHtml(g);
     return { title: g.name, html: h };
@@ -591,10 +592,16 @@ function resultHtml(s) {
 
 function tile(l, v) { return `<div class="tile"><span class="mu">${l}</span><b class="num">${v}</b></div>`; }
 
-function statsHtml(g) {
-  const X = groupStats(g);
-  if (!X.ss.length) return `<div class="empty">Noch keine abgeschlossenen Abende.<br>Statistiken erscheinen, sobald ein Abend abgeschlossen ist.</div>`;
-  let h = `<div class="tiles">${tile('Abende', X.ss.length)}${tile('Ø Dauer', X.durAvg == null ? '–' : fDur(X.durAvg))}${tile('Ø Spieler', (Math.round(X.plAvg * 10) / 10).toLocaleString('de-CH'))}${tile('Ø Pot', chf(X.potAvg))}</div>`;
+function statsHtml(g, c) {
+  const all = D.sessions.filter(s => s.groupId === g.id && s.status === 'closed').sort((a, b) => b.start - a.start);
+  if (!all.length) return `<div class="empty">Noch keine abgeschlossenen Abende.<br>Statistiken erscheinen, sobald ein Abend abgeschlossen ist.</div>`;
+  if (c.until != null && !all.some(s => s.start === c.until)) c.until = null;
+  const X = groupStats(g, c.until);
+  let h = `<label>Statistik bis und mit<select data-f="until">
+    <option value="">Alle Abende (${all.length})</option>
+    ${all.map((s, i) => `<option value="${s.start}" ${c.until === s.start ? 'selected' : ''}>${fDate(s.start)}${all.filter(x => fDate(x.start) === fDate(s.start)).length > 1 ? ', ' + fTime(s.start) : ''} (${all.length - i} Abend${all.length - i > 1 ? 'e' : ''})</option>`).join('')}
+  </select></label>`;
+  h += `<div class="tiles">${tile('Abende', X.ss.length)}${tile('Ø Dauer', X.durAvg == null ? '–' : fDur(X.durAvg))}${tile('Ø Spieler', (Math.round(X.plAvg * 10) / 10).toLocaleString('de-CH'))}${tile('Ø Pot', chf(X.potAvg))}</div>`;
 
   const mx = Math.max(1, ...X.arr.map(q => Math.abs(q.total)));
   h += `<h3>Gesamtbilanz (CHF)</h3><div class="card">` + X.arr.map(q => {
@@ -813,14 +820,14 @@ class PdfDoc {
     return b;
   }
 }
-function groupPdfSection(d, g) {
-  const X = groupStats(g);
+function groupPdfSection(d, g, until) {
+  const X = groupStats(g, until);
   if (!X.ss.length) return;
   const nc = v => v > 0 ? C_POS : v < 0 ? C_NEG : C_TX;
   const r1 = v => (Math.round(v * 10) / 10).toLocaleString('de-CH');
   d.newPage();
   d.rect(0, 801.89, 595.28, 40, [0.078, 0.325, 0.176]);
-  d.text(50, 816, `Gruppenstatistik ${g.name}: alle Abende`, { size: 15, bold: true, color: [1, 1, 1] });
+  d.text(50, 816, `Gruppenstatistik ${g.name}: Abende bis ${new Date(until).toLocaleDateString('de-CH')}`, { size: 15, bold: true, color: [1, 1, 1] });
   d.y = 775;
   const first = X.ss[0].start, last = X.ss[X.ss.length - 1].start;
   [['Abende', `${X.ss.length} (${new Date(first).toLocaleDateString('de-CH')} – ${new Date(last).toLocaleDateString('de-CH')})`],
@@ -914,7 +921,7 @@ function sessionPdf(s) {
     d.heading('Kommen und Gehen');
     moves.forEach(p => { d.need(16); d.text(54, d.y, mName(p.memberId), { size: 10 }); d.text(180, d.y, [p.joined ? 'ab ' + fTime(p.joined) : '', p.left ? 'bis ' + fTime(p.left) : ''].filter(Boolean).join(', '), { size: 10 }); d.y -= 16; });
   }
-  if (g) groupPdfSection(d, g);
+  if (g) groupPdfSection(d, g, s.start);
   return d.build(`Pokerrunde · erstellt ${new Date().toLocaleDateString('de-CH')} ${fTime(Date.now())}`);
 }
 
@@ -1319,6 +1326,11 @@ document.addEventListener('click', ev => {
   const fn = A[el.dataset.a]; if (fn) fn(el);
 });
 document.addEventListener('input', ev => { if (ev.target.classList.contains('endInp')) updateSettleSum(); });
+document.addEventListener('change', ev => {
+  if (ev.target.dataset.f !== 'until') return;
+  cur().until = ev.target.value ? Number(ev.target.value) : null;
+  render();
+});
 
 setInterval(() => {
   const c = cur(); if (c.v !== 'session') return;
