@@ -16,7 +16,7 @@
 :root{--bg:#f2f5f3;--card:#fff;--tx:#15221b;--mu:#5d6b63;--bd:#dde4df;--pri:#166534;--pos:#15803d;--neg:#b91c1c;--hdr:#14532d;--chip:#e6eee9}
 @media (prefers-color-scheme:dark){:root{--bg:#0e1411;--card:#18211c;--tx:#e6ece8;--mu:#9aa8a0;--bd:#2a3630;--pri:#15803d;--pos:#4ade80;--neg:#f87171;--hdr:#0f3d22;--chip:#22302a}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;min-height:100%;background:var(--bg)}
 body{margin:0;font-family:'Aptos','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--tx);font-size:15px;line-height:1.4;
  padding-top:calc(var(--hh,60px) + 10px);padding-bottom:calc(var(--fh,64px) + 16px);
  padding-left:calc(12px + env(safe-area-inset-left));padding-right:calc(12px + env(safe-area-inset-right))}
@@ -129,7 +129,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 const BACKUP_DAYS = 14;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -217,10 +217,11 @@ function sessStats(s) {
     if (st < s.start || st > pe) st = s.start;
     p.hours = Math.max(0, (pe - st) / 3600000);
     if (p.buys.length > 1 && p.buys[1] - p.buys[0] >= 60000) p.ttr = p.buys[1] - p.buys[0];
+    if (s.noTime) { p.hours = 0; p.ttr = null; }
   });
   const pot = arr.reduce((a, p) => a + p.buy, 0);
   const endSum = arr.reduce((a, p) => a + (p.end || 0), 0);
-  return { players: arr, map, pot, endSum, diff: endSum - pot, dur: end - s.start };
+  return { players: arr, map, pot, endSum, diff: endSum - pot, dur: s.noTime ? null : end - s.start };
 }
 
 function settleTx(players) {
@@ -242,40 +243,49 @@ function best(arr, f, dir) {
   const vals = arr.map(f), m = dir > 0 ? Math.max(...vals) : Math.min(...vals);
   return arr.filter((p, i) => vals[i] === m);
 }
+function titleData(icon, name, winners, val) {
+  return winners.length ? { icon, name, who: winners.map(p => mName(p.id)).join(', '), val: val(winners[0]) } : null;
+}
 function titleRow(icon, name, winners, val) {
   if (!winners.length) return '';
   return `<div class="li"><span class="ico">${icon}</span><span class="grow"><b>${esc(name)}</b><div class="mu">${esc(winners.map(p => mName(p.id)).join(', '))}</div></span><span class="num">${val(winners[0])}</span></div>`;
 }
 
-function nightTitles(st) {
+function nightTitlesData(st) {
   const P = st.players.filter(p => p.net != null);
   const q = p => p.allinWins / p.allins;
   const ai2 = P.filter(p => p.allins >= 2);
   const lucky = best(ai2, q, 1), unlucky = best(ai2, q, -1);
-  let h = '';
-  h += titleRow('🦈', 'Haifisch', best(P.filter(p => p.net > 0), p => p.net, 1), p => sgn(p.net));
-  h += titleRow('👑', 'Comeback-König', best(P.filter(p => p.net > 0 && p.rebuys > 0), p => p.net, 1), p => `${p.rebuys} Rebuy${p.rebuys > 1 ? 's' : ''}`);
-  h += titleRow('🏧', 'Bankautomat', best(P.filter(p => p.rebuys > 0), p => p.rebuys, 1), p => `${p.rebuys} Rebuy${p.rebuys > 1 ? 's' : ''}`);
-  h += titleRow('💥', 'Kamikaze', best(P.filter(p => p.allins > 0), p => p.allins, 1), p => `${p.allins} All-in${p.allins > 1 ? 's' : ''}`);
-  h += titleRow('🍀', 'Glückspilz', lucky, p => pct(p.allinWins, p.allins));
-  if (lucky.length && unlucky.length && q(unlucky[0]) < q(lucky[0])) h += titleRow('🌧️', 'Pechvogel', unlucky, p => pct(p.allinWins, p.allins));
-  return h;
+  const r = [
+    titleData('🦈', 'Haifisch', best(P.filter(p => p.net > 0), p => p.net, 1), p => sgn(p.net)),
+    titleData('👑', 'Comeback-König', best(P.filter(p => p.net > 0 && p.rebuys > 0), p => p.net, 1), p => `${p.rebuys} Rebuy${p.rebuys > 1 ? 's' : ''}`),
+    titleData('🏧', 'Bankautomat', best(P.filter(p => p.rebuys > 0), p => p.rebuys, 1), p => `${p.rebuys} Rebuy${p.rebuys > 1 ? 's' : ''}`),
+    titleData('💥', 'Kamikaze', best(P.filter(p => p.allins > 0), p => p.allins, 1), p => `${p.allins} All-in${p.allins > 1 ? 's' : ''}`),
+    titleData('🍀', 'Glückspilz', lucky, p => pct(p.allinWins, p.allins))
+  ];
+  if (lucky.length && unlucky.length && q(unlucky[0]) < q(lucky[0])) r.push(titleData('🌧️', 'Pechvogel', unlucky, p => pct(p.allinWins, p.allins)));
+  return r.filter(Boolean);
+}
+function nightTitles(st) {
+  return nightTitlesData(st).map(x => `<div class="li"><span class="ico">${x.icon}</span><span class="grow"><b>${esc(x.name)}</b><div class="mu">${esc(x.who)}</div></span><span class="num">${x.val}</span></div>`).join('');
 }
 
 function groupStats(g) {
   const ss = D.sessions.filter(s => s.groupId === g.id && s.status === 'closed').sort((a, b) => a.start - b.start);
   const P = {}, beats = {}, cum = {}, series = [];
-  const get = id => P[id] || (P[id] = { id, nights: 0, nets: [], total: 0, buy: 0, rebuys: 0, allins: 0, allinWins: 0, hours: 0, ttr: [], ko: 0, wins: 0 });
-  let durSum = 0, plSum = 0, potSum = 0;
+  const get = id => P[id] || (P[id] = { id, nights: 0, nets: [], total: 0, buy: 0, rebuys: 0, allins: 0, allinWins: 0, hours: 0, timedNet: 0, ttr: [], ko: 0, wins: 0 });
+  let durSum = 0, durN = 0, plSum = 0, potSum = 0;
   ss.forEach(s => {
     const st = sessStats(s);
-    durSum += st.dur; plSum += st.players.length; potSum += st.pot;
+    if (st.dur != null) { durSum += st.dur; durN++; }
+    plSum += st.players.length; potSum += st.pot;
     st.players.forEach(p => {
       const q = get(p.id), net = p.net ?? 0;
       q.nights++; q.nets.push(net); q.total += net; q.buy += p.buy; q.rebuys += p.rebuys;
       q.allins += p.allins; q.allinWins += p.allinWins; q.hours += p.hours;
       if (p.ttr != null) q.ttr.push(p.ttr);
       if (net > 0) q.wins++;
+      if (!s.noTime) q.timedNet += net;
       cum[p.id] = (cum[p.id] || 0) + net;
     });
     s.events.forEach(e => {
@@ -301,20 +311,21 @@ function groupStats(g) {
     }
     q.streak = k ? { n: k, sg } : null;
     q.ttrAvg = q.ttr.length ? q.ttr.reduce((a, b) => a + b, 0) / q.ttr.length : null;
-    q.perH = q.hours > 0 ? q.total / q.hours : null;
+    q.perH = q.hours > 0 ? q.timedNet / q.hours : null;
     q.roi = q.buy ? q.total / q.buy : null;
   });
   arr.sort((a, b) => b.total - a.total);
-  return { ss, arr, beats, series, durAvg: ss.length ? durSum / ss.length : 0, plAvg: ss.length ? plSum / ss.length : 0, potAvg: ss.length ? potSum / ss.length : 0 };
+  return { ss, arr, beats, series, durAvg: durN ? durSum / durN : null, plAvg: ss.length ? plSum / ss.length : 0, potAvg: ss.length ? potSum / ss.length : 0 };
 }
 
 /* ---------- Navigation ---------- */
 let stack = [{ v: 'groups' }];
 let M = {};
 const cur = () => stack[stack.length - 1];
-function go(v) { stack.push(v); render(); window.scrollTo(0, 0); }
-function back() { if (stack.length > 1) { stack.pop(); render(); } }
-function setTab(t) { stack = [{ v: t }]; render(); window.scrollTo(0, 0); }
+const hideToast = () => { const t = document.getElementById('toast'); if (t) t.classList.add('hidden'); };
+function go(v) { hideToast(); stack.push(v); render(); window.scrollTo(0, 0); }
+function back() { if (stack.length > 1) { hideToast(); stack.pop(); render(); } }
+function setTab(t) { hideToast(); stack = [{ v: t }]; render(); window.scrollTo(0, 0); }
 
 function render() {
   const c = cur();
@@ -352,8 +363,9 @@ function askText(title, value, onSave, extra) {
   M.onText = onSave;
   modal(`<h2>${esc(title)}</h2><label>Name<input type="text" data-f="txt" value="${esc(value)}" autocomplete="off"></label>${extra || ''}
   <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="textSave">Speichern</button></div>`);
-  setTimeout(() => { const i = document.querySelector('[data-f=txt]'); if (i) i.focus(); }, 50);
+  if (!value) focusField('[data-f=txt]');
 }
+function focusField(sel) { const i = $('sheet').querySelector(sel); if (i) { i.focus(); try { i.setSelectionRange(i.value.length, i.value.length); } catch (e) {} } }
 function chipsHtml(ids, selected, action) {
   if (!ids.length) return '<div class="mu">Keine verfügbar.</div>';
   return `<div class="chips">${sortIds(ids).map(id => `<button class="chip ${selected.has(id) ? 'on' : ''}" data-a="${action}" data-id="${id}">${esc(mName(id))}</button>`).join('')}</div>`;
@@ -444,6 +456,7 @@ function nightsHtml(g) {
     let info = `${s.players.length} Spieler · Pot ${chf(st.pot)}`;
     if (s.status === 'closed') {
       const w = best(st.players.filter(p => p.net > 0), p => p.net, 1);
+      if (s.noTime) info += ' · nachgetragen';
       if (w.length) info += ` · 🦈 ${esc(w.map(p => mName(p.id)).join(', '))} ${sgn(w[0].net)}`;
     }
     h += `<div class="card tap" data-a="openSession" data-id="${s.id}"><div class="row"><div class="grow"><div class="ttl">${fDate(s.start)}</div><div class="mu">${info}</div></div>
@@ -478,21 +491,22 @@ function liveHtml(s) {
   const g = G(s.groupId), st = sessStats(s);
   const act = s.players.filter(p => !p.left), gone = s.players.filter(p => p.left);
   const paid = gone.reduce((a, p) => a + (p.end || 0), 0);
-  let h = `<div class="sum"><div><div class="mu">Pot</div><b class="num">${NF.format(st.pot / 100)}</b></div><div><div class="mu">Am Tisch</div><b class="num">${NF.format((st.pot - paid) / 100)}</b></div><div><div class="mu">Dauer</div><b data-dur>${fDur(st.dur)}</b></div><div><div class="mu">Spieler</div><b>${act.length}${gone.length ? `<span class="mu"> +${gone.length}</span>` : ''}</b></div></div>`;
+  let h = `<div class="sum"><div><div class="mu">Pot</div><b class="num">${NF.format(st.pot / 100)}</b></div><div><div class="mu">Am Tisch</div><b class="num">${NF.format((st.pot - paid) / 100)}</b></div>${s.noTime ? '' : `<div><div class="mu">Dauer</div><b data-dur>${fDur(st.dur)}</b></div>`}<div><div class="mu">Spieler</div><b>${act.length}${gone.length ? `<span class="mu"> +${gone.length}</span>` : ''}</b></div></div>`;
   act.forEach(pl => {
     const p = st.map[pl.memberId];
-    h += `<div class="card"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}${pl.joined ? ` <span class="badge">ab ${fTime(pl.joined)}</span>` : ''}</div>
+    h += `<div class="card"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}${pl.joined && !s.noTime ? ` <span class="badge">ab ${fTime(pl.joined)}</span>` : ''}</div>
       <div class="mu">${p.buys.length}× Buy-in · ${chf(p.buy)}${p.allins ? ` · All-in ${p.allinWins}/${p.allins}` : ''}</div></div>
       <button class="ibtn" data-a="pmenu" data-m="${p.id}" aria-label="Optionen">⋯</button></div>
       <div class="btns"><button class="btn pri" data-a="buy" data-m="${p.id}">+ ${p.buys.length ? 'Rebuy' : 'Buy-in'} ${NF.format(g.buyIn / 100)}</button>
       <button class="btn warn" data-a="allin" data-m="${p.id}">All-in</button></div></div>`;
   });
   h += `<button class="btn block" data-a="addPlayers">+ Spieler stösst dazu</button>`;
+  if (s.noTime) h = `<div class="banner ok">Nachträglich erfasster Abend ohne Uhrzeiten: Buy-ins und All-ins antippen, dann Endbeträge erfassen.</div>` + h;
   if (gone.length) {
     h += `<h3>Gegangen</h3>`;
     gone.forEach(pl => {
       const p = st.map[pl.memberId];
-      h += `<div class="card gone"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))} <span class="badge">${fTime(pl.left)}</span></div>
+      h += `<div class="card gone"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}${s.noTime ? '' : ` <span class="badge">${fTime(pl.left)}</span>`}</div>
         <div class="mu">Buy-ins ${chf(p.buy)} · ausbezahlt ${chf(p.end)} · <b class="${cls(p.net)}">${sgn(p.net)}</b></div></div>
         <button class="ibtn" data-a="pmenu" data-m="${p.id}" aria-label="Optionen">⋯</button></div></div>`;
     });
@@ -508,14 +522,15 @@ function logHtml(s, collapsed) {
     s.players.filter(p => p.left).map(p => ({ t: p.left, type: 'leave', memberId: p.memberId, amount: p.end }))
   ).sort((a, b) => b.t - a.t);
   if (!ev.length) return '';
+  const tm = x => s.noTime ? '' : fTime(x);
   let h = `<div class="card list">`;
   ev.forEach(e => {
     if (e.type === 'join' || e.type === 'leave') {
-      h += `<div class="li"><span class="mu num">${fTime(e.t)}</span><span class="grow"><b>${esc(mName(e.memberId))}</b> · ${e.type === 'join' ? 'stösst dazu' : 'geht, ausbezahlt ' + chf(e.amount)}</span></div>`;
+      h += `<div class="li"><span class="mu num">${tm(e.t)}</span><span class="grow"><b>${esc(mName(e.memberId))}</b> · ${e.type === 'join' ? 'stösst dazu' : 'geht, ausbezahlt ' + chf(e.amount)}</span></div>`;
       return;
     }
     const t = e.type === 'buyin' ? `Buy-in ${chf(e.amount)}` : `All-in ${e.won ? 'gewonnen' : 'verloren'}${e.opp ? ` gegen ${esc(mName(e.opp))}` : ''}`;
-    h += `<div class="li"><span class="mu num">${fTime(e.t)}</span><span class="grow"><b>${esc(mName(e.memberId))}</b> · ${t}</span><button class="ibtn" data-a="delEvent" data-id="${e.id}" aria-label="Löschen">✕</button></div>`;
+    h += `<div class="li"><span class="mu num">${tm(e.t)}</span><span class="grow"><b>${esc(mName(e.memberId))}</b> · ${t}</span><button class="ibtn" data-a="delEvent" data-id="${e.id}" aria-label="Löschen">✕</button></div>`;
   });
   h += `</div>`;
   return collapsed ? `<details><summary>Verlauf (${ev.length} Einträge)</summary>${h}</details>` : `<h3>Verlauf</h3>${h}`;
@@ -524,7 +539,8 @@ function logHtml(s, collapsed) {
 function resultHtml(s) {
   const st = sessStats(s);
   const P = st.players.slice().sort((a, b) => (b.net ?? -1e15) - (a.net ?? -1e15));
-  let h = `<div class="tiles"><div class="tile"><span class="mu">Pot</span><b class="num">${chf(st.pot)}</b></div><div class="tile"><span class="mu">Dauer</span><b>${fDur(st.dur)}</b></div></div>`;
+  let h = `<div class="tiles"><div class="tile"><span class="mu">Pot</span><b class="num">${chf(st.pot)}</b></div>${st.dur == null ? `<div class="tile"><span class="mu">Spieler</span><b>${st.players.length}</b></div>` : `<div class="tile"><span class="mu">Dauer</span><b>${fDur(st.dur)}</b></div>`}</div>`;
+  if (s.noTime) h += `<div class="note">Nachgetragen ohne Uhrzeiten: Dauer, CHF/h und Zeit bis Rebuy entfallen.</div>`;
   if (st.diff !== 0) h += `<div class="banner err">⚠️ Kontrollsumme stimmt nicht: Endbeträge ${chf(st.endSum)}, Buy-ins ${chf(st.pot)} (Differenz ${sgn(st.diff)}). <u data-a="editEnds">Korrigieren</u></div>`;
   h += `<h3>Resultat</h3><div class="card tw"><table><tr><th>Spieler</th><th>Buy-in</th><th>Ende</th><th>Netto</th><th>ROI</th></tr>`;
   P.forEach(p => {
@@ -542,6 +558,7 @@ function resultHtml(s) {
     h += `<tr><td>${esc(mName(p.id))}</td><td>${p.rebuys}</td><td>${p.allins}</td><td>${pct(p.allinWins, p.allins)}</td><td class="${cls(p.net)}">${p.net != null && p.hours > 0 ? sgn(Math.round(p.net / p.hours)) : '–'}</td><td>${p.ttr ? fDur(p.ttr) : '–'}</td></tr>`;
   });
   h += `</table></div>`;
+  h += `<button class="btn pri block big" data-a="exportPdf">📄 Als PDF exportieren</button>`;
   h += `<button class="btn block" data-a="editEnds">Endbeträge bearbeiten</button><button class="btn block" data-a="reopen">Abend wieder öffnen</button>`;
   h += logHtml(s, true);
   return h;
@@ -552,7 +569,7 @@ function tile(l, v) { return `<div class="tile"><span class="mu">${l}</span><b c
 function statsHtml(g) {
   const X = groupStats(g);
   if (!X.ss.length) return `<div class="empty">Noch keine abgeschlossenen Abende.<br>Statistiken erscheinen, sobald ein Abend abgeschlossen ist.</div>`;
-  let h = `<div class="tiles">${tile('Abende', X.ss.length)}${tile('Ø Dauer', fDur(X.durAvg))}${tile('Ø Spieler', (Math.round(X.plAvg * 10) / 10).toLocaleString('de-CH'))}${tile('Ø Pot', chf(X.potAvg))}</div>`;
+  let h = `<div class="tiles">${tile('Abende', X.ss.length)}${tile('Ø Dauer', X.durAvg == null ? '–' : fDur(X.durAvg))}${tile('Ø Spieler', (Math.round(X.plAvg * 10) / 10).toLocaleString('de-CH'))}${tile('Ø Pot', chf(X.potAvg))}</div>`;
 
   const mx = Math.max(1, ...X.arr.map(q => Math.abs(q.total)));
   h += `<h3>Gesamtbilanz (CHF)</h3><div class="card">` + X.arr.map(q => {
@@ -640,6 +657,127 @@ function updateSettleSum() {
     ${bad ? '<div class="neg">Ungültige Eingabe.</div>' : ''}${empty ? `<div class="mu">${empty} Feld${empty > 1 ? 'er' : ''} leer.</div>` : ''}`;
 }
 
+/* ---------- PDF (eigener Generator, ohne Bibliothek) ---------- */
+const HW = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+const PDF_MAP = { '−': '-', '–': '-', '—': '-', '→': '->', '’': "'", '‘': "'", '“': '"', '”': '"', '…': '...', '✓': 'OK', ' ': ' ', ' ': ' ' };
+function pdfStr(s) {
+  let o = '';
+  for (const ch of String(s ?? '')) {
+    if (PDF_MAP[ch] !== undefined) { o += PDF_MAP[ch]; continue; }
+    const c = ch.codePointAt(0);
+    if (c >= 32 && (c < 127 || (c >= 160 && c < 256))) o += ch;
+  }
+  return o.trim();
+}
+function pdfW(s, size) {
+  let w = 0;
+  for (const ch of s) {
+    let c = ch.charCodeAt(0);
+    if (c >= 127) c = ch.normalize('NFD').charCodeAt(0);
+    w += c >= 32 && c < 127 ? HW[c - 32] : 556;
+  }
+  return w * size / 1000;
+}
+const C_TX = [0.08, 0.13, 0.1], C_MU = [0.36, 0.42, 0.39], C_POS = [0.08, 0.5, 0.24], C_NEG = [0.73, 0.11, 0.11];
+class PdfDoc {
+  constructor() { this.pages = []; this.newPage(); }
+  newPage() { this.cur = []; this.pages.push(this.cur); this.y = 790; }
+  op(x, y, s, o = {}) {
+    s = pdfStr(s); const size = o.size || 10;
+    if (o.align === 'right') x -= pdfW(s, size);
+    const col = (o.color || C_TX).map(n => n.toFixed(3)).join(' ');
+    return `${col} rg BT /${o.bold ? 'F2' : 'F1'} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${s.replace(/[\\()]/g, '\\$&')}) Tj ET`;
+  }
+  text(x, y, s, o) { this.cur.push(this.op(x, y, s, o)); }
+  line(x1, x2, y, g = 0.85) { this.cur.push(`${g} G 0.6 w ${x1} ${y.toFixed(2)} m ${x2} ${y.toFixed(2)} l S`); }
+  need(h) { if (this.y - h < 60) this.newPage(); }
+  heading(t) { this.need(50); this.y -= 14; this.text(50, this.y, t.toUpperCase(), { size: 9, bold: true, color: C_MU }); this.y -= 16; }
+  table(cols, rows) {
+    const L = 50, W = cols.reduce((a, c) => a + c.w, 0);
+    const row = (cells, head) => {
+      this.need(18);
+      let x = L;
+      cells.forEach((c, i) => {
+        const col = cols[i], cell = c && typeof c === 'object' ? c : { t: c };
+        const right = i > 0;
+        this.text(right ? x + col.w - 4 : x + 4, this.y, cell.t, { size: 9.5, bold: head || cell.bold, align: right ? 'right' : 'left', color: head ? C_MU : cell.color });
+        x += col.w;
+      });
+      this.line(L, L + W, this.y - 6, head ? 0.6 : 0.85);
+      this.y -= 18;
+    };
+    row(cols.map(c => c.h), true);
+    rows.forEach(r => row(r, false));
+  }
+  build(footer) {
+    const objs = [];
+    objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+    objs[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+    objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+    const kids = []; let n = 5;
+    this.pages.forEach((c, i) => {
+      const stream = c.concat([this.op(50, 32, footer, { size: 8, color: C_MU }), this.op(545, 32, `Seite ${i + 1}/${this.pages.length}`, { size: 8, color: C_MU, align: 'right' })]).join('\n');
+      const pid = n++, cid = n++;
+      kids.push(pid + ' 0 R');
+      objs[pid] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${cid} 0 R >>`;
+      objs[cid] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+    });
+    objs[2] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${kids.length} >>`;
+    let out = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
+    const off = [];
+    for (let i = 1; i < objs.length; i++) { off[i] = out.length; out += `${i} 0 obj\n${objs[i]}\nendobj\n`; }
+    const xref = out.length;
+    out += `xref\n0 ${objs.length}\n0000000000 65535 f \n` + off.slice(1).map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+    out += `trailer\n<< /Size ${objs.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    const b = new Uint8Array(out.length);
+    for (let i = 0; i < out.length; i++) b[i] = out.charCodeAt(i) & 255;
+    return b;
+  }
+}
+function sessionPdf(s) {
+  const g = G(s.groupId), st = sessStats(s);
+  const P = st.players.slice().sort((a, b) => (b.net ?? -1e15) - (a.net ?? -1e15));
+  const d = new PdfDoc();
+  const nc = v => v > 0 ? C_POS : v < 0 ? C_NEG : C_TX;
+  d.cur.push('0.078 0.325 0.176 rg 0 771.89 595.28 70 re f');
+  d.text(50, 810, 'Pokerabend ' + new Date(s.start).toLocaleDateString('de-CH', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }), { size: 18, bold: true, color: [1, 1, 1] });
+  d.text(50, 790, g ? g.name : '', { size: 11, color: [0.85, 0.93, 0.88] });
+  d.y = 745;
+  const info = [['Pot', chf(st.pot)], ['Spieler', String(st.players.length)]];
+  if (s.noTime) info.push(['Zeit', 'nachgetragen, ohne Uhrzeiten']);
+  else info.push(['Zeit', `${fTime(s.start)} – ${s.end ? fTime(s.end) : 'läuft'}`], ['Dauer', fDur(st.dur)]);
+  info.forEach(([k, v]) => { d.text(50, d.y, k, { size: 10, color: C_MU }); d.text(130, d.y, v, { size: 10, bold: true }); d.y -= 15; });
+  if (st.diff !== 0) { d.y -= 4; d.text(50, d.y, `Achtung: Kontrollsumme stimmt nicht. Endbeträge ${chf(st.endSum)}, Buy-ins ${chf(st.pot)}, Differenz ${sgn(st.diff)}.`, { size: 9.5, color: C_NEG }); d.y -= 15; }
+  d.heading('Resultat');
+  d.table([{ h: 'Spieler', w: 150 }, { h: 'Buy-ins', w: 55 }, { h: 'Buy-in CHF', w: 75 }, { h: 'Ende CHF', w: 75 }, { h: 'Netto CHF', w: 80 }, { h: 'ROI', w: 60 }],
+    P.map(p => [mName(p.id), String(p.buys.length), NF.format(p.buy / 100), p.end == null ? '-' : NF.format(p.end / 100),
+      { t: p.net == null ? '-' : sgn(p.net), bold: true, color: nc(p.net) }, p.buy && p.net != null ? pctS(p.net / p.buy) : '-']));
+  d.heading('Ausgleich');
+  const tx = settleTx(P.map(p => ({ id: p.id, net: p.net || 0 })));
+  if (!tx.length) { d.text(50, d.y, 'Kein Ausgleich nötig.', { size: 10 }); d.y -= 16; }
+  tx.forEach(x => { d.need(16); d.text(54, d.y, `${mName(x.from)} → ${mName(x.to)}`, { size: 10 }); d.text(400, d.y, chf(x.v), { size: 10, bold: true, align: 'right' }); d.y -= 16; });
+  d.text(50, d.y, 'Gilt, wenn die Buy-ins nicht bar in eine gemeinsame Kasse bezahlt wurden.', { size: 8, color: C_MU }); d.y -= 6;
+  const tt = nightTitlesData(st);
+  if (tt.length) {
+    d.heading('Titel des Abends');
+    tt.forEach(x => { d.need(16); d.text(54, d.y, x.name, { size: 10, bold: true }); d.text(180, d.y, x.who, { size: 10 }); d.text(545, d.y, x.val, { size: 10, align: 'right' }); d.y -= 16; });
+  }
+  d.heading('Details');
+  const cols = [{ h: 'Spieler', w: 130 }, { h: 'Rebuys', w: 55 }, { h: 'All-ins', w: 55 }, { h: 'gewonnen', w: 65 }];
+  if (!s.noTime) cols.push({ h: 'am Tisch', w: 65 }, { h: 'CHF/h', w: 60 }, { h: 'bis Rebuy', w: 65 });
+  d.table(cols, P.map(p => {
+    const r = [mName(p.id), String(p.rebuys), String(p.allins), pct(p.allinWins, p.allins)];
+    if (!s.noTime) r.push(p.hours > 0 ? fDur(p.hours * 3600000) : '-', { t: p.net != null && p.hours > 0 ? sgn(Math.round(p.net / p.hours)) : '-', color: nc(p.net) }, p.ttr ? fDur(p.ttr) : '-');
+    return r;
+  }));
+  const moves = s.players.filter(p => (p.joined || p.left) && !s.noTime);
+  if (moves.length) {
+    d.heading('Kommen und Gehen');
+    moves.forEach(p => { d.need(16); d.text(54, d.y, mName(p.memberId), { size: 10 }); d.text(180, d.y, [p.joined ? 'ab ' + fTime(p.joined) : '', p.left ? 'bis ' + fTime(p.left) : ''].filter(Boolean).join(', '), { size: 10 }); d.y -= 16; });
+  }
+  return d.build(`Pokerrunde · erstellt ${new Date().toLocaleDateString('de-CH')} ${fTime(Date.now())}`);
+}
+
 /* ---------- Aktionen ---------- */
 function addBuy(s, memberId, amount, t) {
   const e = { id: uid(), t: t || Date.now(), type: 'buyin', memberId, amount };
@@ -670,7 +808,8 @@ const A = {
   hmenu() {
     const s = S(cur().id); if (!s) return;
     modal(`<h2>Abend ${fDate(s.start)}</h2>
-      <button class="btn block" data-a="editTimes">Start-/Endzeit ändern</button>
+      <button class="btn block" data-a="editTimes">${s.noTime ? 'Datum ändern' : 'Start-/Endzeit ändern'}</button>
+      ${s.status === 'closed' ? '<button class="btn block" data-a="exportPdf">Als PDF exportieren</button>' : ''}
       ${s.status === 'open' ? '<button class="btn block" data-a="addPlayers">Spieler stösst dazu</button>' : '<button class="btn block" data-a="editEnds">Endbeträge bearbeiten</button><button class="btn block" data-a="reopen">Wieder öffnen</button>'}
       <button class="btn danger block" data-a="delSession">Abend löschen</button>
       <button class="btn block" data-a="modalClose">Schliessen</button>`);
@@ -737,10 +876,17 @@ const A = {
     const ids = g.memberIds.filter(id => !isArch(id));
     if (ids.length < 2) { toast('Mindestens 2 Mitglieder in der Gruppe nötig.'); cur().sub = 'members'; return render(); }
     M = { sel: new Set(ids), gid: g.id };
-    modal(`<h2>Neuer Abend</h2><label>Start<input type="datetime-local" data-f="nsStart" value="${dtLocal(Date.now())}"></label>
+    modal(`<h2>Neuer Abend</h2>
+      <label class="chk"><input type="checkbox" data-f="nsPast" data-a="nsPast"> Vergangenen Abend nachtragen (ohne Uhrzeiten)</label>
+      <label data-w="now">Start<input type="datetime-local" data-f="nsStart" value="${dtLocal(Date.now())}"></label>
+      <label data-w="past" class="hidden">Datum<input type="date" data-f="nsDate" value="${today()}"></label>
       <div class="lbl">Teilnehmer</div>${chipsHtml(ids, M.sel, 'chip')}
       <label class="chk"><input type="checkbox" data-f="nsBuy" checked> Allen den ersten Buy-in (${chf(g.buyIn)}) buchen</label>
       <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="createSession">Starten</button></div>`);
+  },
+  nsPast(el) {
+    $('sheet').querySelector('[data-w=now]').classList.toggle('hidden', el.checked);
+    $('sheet').querySelector('[data-w=past]').classList.toggle('hidden', !el.checked);
   },
   chip(el) { const id = el.dataset.id; if (M.sel.has(id)) M.sel.delete(id); else M.sel.add(id); el.classList.toggle('on', M.sel.has(id)); },
   chip1(el) {
@@ -751,9 +897,19 @@ const A = {
   createSession() {
     if (M.sel.size < 2) return toast('Mindestens 2 Teilnehmer wählen.');
     const g = G(M.gid);
-    const v = document.querySelector('[data-f=nsStart]').value;
-    const start = v ? new Date(v).getTime() : Date.now();
-    const s = { id: uid(), groupId: g.id, start: isNaN(start) ? Date.now() : start, end: null, status: 'open', players: sortIds([...M.sel]).map(id => ({ memberId: id, end: null })), events: [] };
+    const past = document.querySelector('[data-f=nsPast]').checked;
+    let start;
+    if (past) {
+      const dv = document.querySelector('[data-f=nsDate]').value;
+      start = dv ? new Date(dv + 'T20:00').getTime() : NaN;
+      if (isNaN(start)) return toast('Bitte Datum wählen.');
+    } else {
+      const v = document.querySelector('[data-f=nsStart]').value;
+      start = v ? new Date(v).getTime() : Date.now();
+      if (isNaN(start)) start = Date.now();
+    }
+    const s = { id: uid(), groupId: g.id, start, end: null, status: 'open', players: sortIds([...M.sel]).map(id => ({ memberId: id, end: null })), events: [] };
+    if (past) s.noTime = true;
     if (document.querySelector('[data-f=nsBuy]').checked) s.players.forEach(p => addBuy(s, p.memberId, g.buyIn, s.start));
     D.sessions.push(s); save(); closeModal();
     go({ v: 'session', id: s.id });
@@ -790,7 +946,7 @@ const A = {
     modal(`<h2>${esc(mName(M.m))} geht</h2><div class="mu">Buy-ins: ${p.buys.length}× · ${chf(p.buy)}</div>
       <label>Endbetrag (Chips beim Gehen, CHF)<input inputmode="decimal" data-f="lAmt" placeholder="0.00"></label>
       <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="leaveSave">Auszahlen</button></div>`);
-    setTimeout(() => { const i = document.querySelector('[data-f=lAmt]'); if (i) i.focus(); }, 50);
+    focusField('[data-f=lAmt]');
   },
   leaveSave() {
     const s = S(cur().id), pl = s.players.find(p => p.memberId === M.m);
@@ -874,7 +1030,7 @@ const A = {
     const sum = Object.values(vals).reduce((a, v) => a + (v || 0), 0);
     if (sum !== st.pot && !confirm(`Kontrollsumme stimmt nicht (Differenz ${sgn(sum - st.pot)}). Trotzdem speichern?`)) return;
     s.players.forEach(p => { p.end = vals[p.memberId] || 0; });
-    if (s.status !== 'closed') { s.status = 'closed'; s.end = Date.now(); }
+    if (s.status !== 'closed') { s.status = 'closed'; s.end = s.noTime ? s.start : Date.now(); }
     save(); stack.pop(); render(); window.scrollTo(0, 0);
   },
   reopen() {
@@ -884,19 +1040,40 @@ const A = {
   },
   editTimes() {
     const s = S(cur().id);
+    if (s.noTime) {
+      modal(`<h2>Datum ändern</h2><label>Datum<input type="date" data-f="tDate" value="${dtLocal(s.start).slice(0, 10)}"></label>
+        <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="timesSave">Speichern</button></div>`);
+      return;
+    }
     modal(`<h2>Zeiten ändern</h2><label>Start<input type="datetime-local" data-f="tStart" value="${dtLocal(s.start)}"></label>
       ${s.end ? `<label>Ende<input type="datetime-local" data-f="tEnd" value="${dtLocal(s.end)}"></label>` : ''}
+      <div class="note">Liegen erfasste Einträge (Buy-ins, All-ins, Kommen/Gehen) ausserhalb der neuen Zeit, werden sie proportional in den neuen Zeitraum verschoben. Alle Statistiken rechnen danach mit den neuen Zeiten.</div>
       <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="timesSave">Speichern</button></div>`);
   },
   timesSave() {
     const s = S(cur().id);
+    const all = f => { s.events.forEach(e => e.t = f(e.t)); s.players.forEach(p => { if (p.joined) p.joined = f(p.joined); if (p.left) p.left = f(p.left); }); };
+    if (s.noTime) {
+      const dv = document.querySelector('[data-f=tDate]').value;
+      const st = dv ? new Date(dv + 'T20:00').getTime() : NaN;
+      if (isNaN(st)) return toast('Ungültiges Datum.');
+      const d = st - s.start; all(x => x + d);
+      s.start = st; if (s.end) s.end = st;
+      save(); closeModal(); render(); return;
+    }
     const st = new Date(document.querySelector('[data-f=tStart]').value).getTime();
     const ei = document.querySelector('[data-f=tEnd]');
     const en = ei ? new Date(ei.value).getTime() : null;
     if (isNaN(st) || (ei && isNaN(en))) return toast('Ungültige Zeit.');
     if (en != null && en <= st) return toast('Ende muss nach dem Start liegen.');
-    const old = s.start;
-    s.events.forEach(e => { if (e.t === old) e.t = st; });
+    if (en == null && st > Date.now()) return toast('Start darf nicht in der Zukunft liegen.');
+    const os = s.start, oe = s.end || Date.now(), ne = en != null ? en : Date.now();
+    const ts = s.events.map(e => e.t).concat(s.players.map(p => p.joined).filter(Boolean), s.players.map(p => p.left).filter(Boolean));
+    if (ts.every(x => x >= st && x <= ne)) {
+      all(x => x === os ? st : x);
+    } else {
+      all(x => Math.round(st + (Math.min(Math.max(x, os), oe) - os) / Math.max(1, oe - os) * (ne - st)));
+    }
     s.start = st; if (en != null) s.end = en;
     save(); closeModal(); render();
   },
@@ -933,6 +1110,14 @@ const A = {
     save(); closeModal(); render();
   },
 
+  exportPdf() {
+    const s = S(cur().id), g = G(s.groupId);
+    closeModal();
+    const d = new Date(s.start);
+    const name = `Pokerabend-${(g ? g.name : '').replace(/[^\wäöüÄÖÜ-]+/g, '_')}-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.pdf`;
+    try { shareOrDownload(sessionPdf(s), name, 'application/pdf'); }
+    catch (e) { console.error(e); alert('PDF-Export fehlgeschlagen: ' + e.message); }
+  },
   async exportJson() {
     const txt = JSON.stringify({ app: 'pokerrunde', format: 1, exported: new Date().toISOString(), data: D });
     const ok = await shareOrDownload(txt, `pokerrunde-backup-${today()}.json`, 'application/json');
@@ -967,6 +1152,11 @@ setInterval(() => {
 }, 30000);
 
 window.addEventListener('resize', measure);
+window.addEventListener('orientationchange', () => setTimeout(measure, 300));
+window.addEventListener('pageshow', measure);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) measure(); });
+if (window.visualViewport) window.visualViewport.addEventListener('resize', measure);
+[100, 400, 1000, 2500].forEach(ms => setTimeout(measure, ms));
 if (window.ResizeObserver) { const ro = new ResizeObserver(measure); ro.observe($('hdr')); ro.observe($('ftr')); }
 
 (async function init() {
