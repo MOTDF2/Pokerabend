@@ -46,6 +46,7 @@ main{max-width:720px;margin:0 auto}
 .btn.warn{background:#b45309;border-color:#b45309;color:#fff}
 .btn.bwin{background:#15803d;border-color:#15803d;color:#fff}
 .btn.blose{background:#b91c1c;border-color:#b91c1c;color:#fff}
+.btn.bwin2{background:#4d7c0f;border-color:#4d7c0f;color:#fff}
 .btn.danger{color:var(--neg);border-color:var(--neg)}
 .btn:active{opacity:.75}
 .block{display:block;width:100%;margin:10px 0}
@@ -139,7 +140,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.7';
+const APP_VERSION = '1.10';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -209,6 +210,12 @@ const S = id => D.sessions.find(s => s.id === id);
 const sortIds = ids => ids.slice().sort((a, b) => mName(a).localeCompare(mName(b), 'de'));
 
 /* ---------- Berechnungen ---------- */
+function pausedMs(s, a, b) {
+  if (!s.pauses || b <= a) return 0;
+  return s.pauses.reduce((sum, p) => sum + Math.max(0, Math.min(b, p.to || Date.now()) - Math.max(a, p.from)), 0);
+}
+const isPaused = s => !!(s.pauses && s.pauses.some(p => !p.to));
+
 function sessStats(s) {
   const end = s.end || Date.now();
   const map = {};
@@ -225,13 +232,13 @@ function sessStats(s) {
     const pe = p.left && p.left > s.start && p.left < end ? p.left : end;
     let st = p.buys.length ? p.buys[0] : s.start;
     if (st < s.start || st > pe) st = s.start;
-    p.hours = Math.max(0, (pe - st) / 3600000);
-    if (p.buys.length > 1 && p.buys[1] - p.buys[0] >= 60000) p.ttr = p.buys[1] - p.buys[0];
+    p.hours = Math.max(0, (pe - st - pausedMs(s, st, pe)) / 3600000);
+    if (p.buys.length > 1 && p.buys[1] - p.buys[0] >= 60000) p.ttr = Math.max(0, p.buys[1] - p.buys[0] - pausedMs(s, p.buys[0], p.buys[1]));
     if (s.noTime) { p.hours = 0; p.ttr = null; }
   });
   const pot = arr.reduce((a, p) => a + p.buy, 0);
   const endSum = arr.reduce((a, p) => a + (p.end || 0), 0);
-  return { players: arr, map, pot, endSum, diff: endSum - pot, dur: s.noTime ? null : end - s.start };
+  return { players: arr, map, pot, endSum, diff: endSum - pot, dur: s.noTime ? null : Math.max(0, end - s.start - pausedMs(s, s.start, end)), pause: s.noTime ? 0 : pausedMs(s, s.start, end) };
 }
 
 function settleTx(players) {
@@ -302,7 +309,8 @@ function groupStats(g) {
       if (e.type !== 'allin' || !e.opp || !st.map[e.opp]) return;
       const w = e.won ? e.memberId : e.opp, l = e.won ? e.opp : e.memberId;
       (beats[w] || (beats[w] = {}))[l] = ((beats[w] || {})[l] || 0) + 1;
-      if (!e.won) get(e.opp).ko++;
+      if (!e.won && e.bust !== false) get(e.opp).ko++;
+      if (e.won && e.oppBust) get(e.memberId).ko++;
     });
     series.push({ t: s.start, cum: { ...cum } });
   });
@@ -499,8 +507,10 @@ function liveHtml(s) {
   const g = G(s.groupId), st = sessStats(s);
   const act = s.players.filter(p => !p.left), gone = s.players.filter(p => p.left);
   const paid = gone.reduce((a, p) => a + (p.end || 0), 0);
+  const pz = (s.pauses || []).find(p => !p.to);
   const buyLbl = g.buyIn % 100 === 0 ? String(g.buyIn / 100) : NF.format(g.buyIn / 100);
   let h = `<div class="sum" data-host><div><div class="mu">Pot</div><b class="num">${NF.format(st.pot / 100)}</b></div><div><div class="mu">Am Tisch${ib('pot')}</div><b class="num">${NF.format((st.pot - paid) / 100)}</b></div>${s.noTime ? '' : `<div><div class="mu">Dauer</div><b data-dur>${fDur(st.dur)}</b></div>`}<div><div class="mu">Spieler</div><b>${act.length}${gone.length ? `<span class="mu"> +${gone.length}</span>` : ''}</b></div></div>`;
+  if (pz) h += `<div class="banner" style="cursor:default"><div class="row"><span class="grow">⏸ <b>Pause</b> seit ${fTime(pz.from)}${ib('pause')}</span><button class="btn pri" data-a="resume">▶ Fortsetzen</button></div></div>`;
   act.forEach(pl => {
     const p = st.map[pl.memberId];
     h += `<div class="card pc"><div class="row"><div class="grow"><div class="ttl">${esc(mName(p.id))}${pl.joined && !s.noTime ? ` <span class="badge">ab ${fTime(pl.joined)}</span>` : ''}</div>
@@ -520,6 +530,7 @@ function liveHtml(s) {
         <button class="ibtn" data-a="pmenu" data-m="${p.id}" aria-label="Optionen">⋯</button></div></div>`;
     });
   }
+  if (!s.noTime && !pz) h += `<button class="btn block" data-a="pause">⏸ Pause</button>`;
   h += `<button class="btn pri block big" data-a="endSession">Abend beenden: Endbeträge erfassen</button>`;
   h += logHtml(s, false);
   return h;
@@ -528,17 +539,22 @@ function liveHtml(s) {
 function logHtml(s, collapsed) {
   const ev = s.events.concat(
     s.players.filter(p => p.joined).map(p => ({ t: p.joined, type: 'join', memberId: p.memberId })),
-    s.players.filter(p => p.left).map(p => ({ t: p.left, type: 'leave', memberId: p.memberId, amount: p.end }))
+    s.players.filter(p => p.left).map(p => ({ t: p.left, type: 'leave', memberId: p.memberId, amount: p.end })),
+    s.noTime ? [] : (s.pauses || []).map(p => ({ t: p.from, type: 'pause', to: p.to }))
   ).sort((a, b) => b.t - a.t);
   if (!ev.length) return '';
   const tm = x => s.noTime ? '' : fTime(x);
   let h = `<div class="card list">`;
   ev.forEach(e => {
+    if (e.type === 'pause') {
+      h += `<div class="li"><span class="mu num">${tm(e.t)}</span><span class="grow">⏸ Pause ${e.to ? `bis ${fTime(e.to)} (${fDur(e.to - e.t)})` : 'läuft'}</span></div>`;
+      return;
+    }
     if (e.type === 'join' || e.type === 'leave') {
       h += `<div class="li"><span class="mu num">${tm(e.t)}</span><span class="grow"><b>${esc(mName(e.memberId))}</b> · ${e.type === 'join' ? 'stösst dazu' : 'geht, ausbezahlt ' + chf(e.amount)}</span></div>`;
       return;
     }
-    const t = e.type === 'buyin' ? `Buy-in ${chf(e.amount)}` : `All-in ${e.won ? 'gewonnen' : 'verloren'}${e.opp ? ` gegen ${esc(mName(e.opp))}` : ''}`;
+    const t = e.type === 'buyin' ? `Buy-in ${chf(e.amount)}` : `All-in ${e.won ? 'gewonnen' : e.bust === false ? 'verloren, noch Chips' : 'verloren, raus'}${e.opp ? ` gegen ${esc(mName(e.opp))}` : ''}${e.won && e.oppBust ? ', Gegner raus' : ''}`;
     h += `<div class="li"><span class="mu num">${tm(e.t)}</span><span class="grow"><b>${esc(mName(e.memberId))}</b> · ${t}</span><button class="ibtn" data-a="delEvent" data-id="${e.id}" aria-label="Löschen">✕</button></div>`;
   });
   h += `</div>`;
@@ -548,7 +564,7 @@ function logHtml(s, collapsed) {
 function resultHtml(s) {
   const st = sessStats(s);
   const P = st.players.slice().sort((a, b) => (b.net ?? -1e15) - (a.net ?? -1e15));
-  let h = `<div class="tiles"><div class="tile"><span class="mu">Pot</span><b class="num">${chf(st.pot)}</b></div>${st.dur == null ? `<div class="tile"><span class="mu">Spieler</span><b>${st.players.length}</b></div>` : `<div class="tile"><span class="mu">Dauer</span><b>${fDur(st.dur)}</b></div>`}</div>`;
+  let h = `<div class="tiles"><div class="tile"><span class="mu">Pot</span><b class="num">${chf(st.pot)}</b></div>${st.dur == null ? `<div class="tile"><span class="mu">Spieler</span><b>${st.players.length}</b></div>` : `<div class="tile"><span class="mu">Dauer${st.pause >= 60000 ? ' ohne Pausen' : ''}</span><b>${fDur(st.dur)}</b>${st.pause >= 60000 ? `<span class="mu">Pausen: ${fDur(st.pause)}</span>` : ''}</div>`}</div>`;
   if (s.noTime) h += `<div class="mu" style="margin:0 2px 8px">Nachgetragener Abend${ib('noTime')}</div>`;
   if (st.diff !== 0) h += `<div class="banner err">⚠️ Kontrollsumme stimmt nicht: Endbeträge ${chf(st.endSum)}, Buy-ins ${chf(st.pot)} (Differenz ${sgn(st.diff)}). <u data-a="editEnds">Korrigieren</u></div>`;
   h += `<h3>Resultat</h3><div class="card tw"><table><tr><th>Spieler</th><th>Buy-in</th><th>Ende</th><th>Netto</th><th>ROI</th></tr>`;
@@ -629,11 +645,13 @@ const HELP = {
   pot: 'Pot: alle Buy-ins. Am Tisch: Pot minus das, was gegangenen Spielern bereits ausbezahlt wurde.',
   settle: 'Zeigt, wer wem wie viel zahlt. Gilt, wenn die Buy-ins nicht bar in eine gemeinsame Kasse bezahlt wurden.',
   rank: 'Siegquote: Anteil Abende im Plus. ROI: Netto im Verhältnis zu den Buy-ins. CHF/h: Netto pro Stunde am Tisch. Streuung: wie stark die Ergebnisse schwanken (Standardabweichung, CHF). Serie: aktuelle Plus- oder Minusserie.',
-  duels: 'Nemesis: Spieler, gegen den man die meisten All-in-Duelle verloren hat. Lieblingsopfer: gegen wen man die meisten gewonnen hat. Knockout: ein Gegner verliert sein All-in gegen diesen Spieler. Zählt nur, wenn beim All-in der Gegner erfasst wurde.',
+  duels: 'Nemesis: Spieler, gegen den man die meisten All-in-Duelle verloren hat. Lieblingsopfer: gegen wen man die meisten gewonnen hat. Knockout: ein Gegner scheidet in einem All-in-Duell gegen diesen Spieler aus (keine Chips mehr), egal wer All-in ging. Zählt nur, wenn der Gegner erfasst wurde.',
   matrix: 'Zahl = gewonnene All-in-Duelle des Spielers in der Zeile gegen den Spieler in der Spalte.',
   noRemove: 'Der Spieler hat bereits Einträge. Zum Entfernen zuerst seine Einträge im Verlauf löschen.',
   times: 'Liegen Einträge ausserhalb der neuen Zeit, werden sie anteilig verschoben. Alle Statistiken rechnen danach mit den neuen Zeiten.',
   noDelete: 'Mitglied ist in Abenden erfasst und kann nicht gelöscht werden. Archivieren blendet es in allen Auswahlen aus, die Statistik bleibt.',
+  bust: 'Raus = keine Chips mehr. Wer jemanden rauswirft, erhält einen Knockout, egal wer All-in ging. Noch Chips = der Verlierer hatte mehr Chips und bleibt im Spiel. Für die Duell-Statistik zählt jedes gewonnene oder verlorene All-in. «Gegner raus» braucht einen gewählten Gegner.',
+  pause: 'Während der Pause steht die Spielzeit still. Dauer, CHF/h, Zeit am Tisch und Zeit bis Rebuy werden ohne Pausen gerechnet. Buy-ins und All-ins können trotzdem erfasst werden.',
   ties: 'Bei Gleichstand erhalten alle Betroffenen den Titel. Ein Titel erscheint nur, wenn die Bedingung erfüllt ist.'
 };
 const ib = k => `<button class="ib" data-a="help" data-k="${k}" aria-label="Info">ⓘ</button>`;
@@ -654,7 +672,7 @@ const TITLE_INFO = {
     ['💥', 'Kamikaze', 'Meiste All-ins pro Abend im Durchschnitt.'],
     ['🍀', 'Glückspilz', 'Beste All-in-Quote über alle Abende. Erst ab 5 All-ins.'],
     ['🌧️', 'Pechvogel', 'Schlechteste All-in-Quote, ab 5 All-ins. Erscheint nur, wenn sie tiefer ist als die des Glückspilzes.'],
-    ['🎯', 'Knockout-König', 'Meiste Knockouts: Ein Gegner hat sein All-in gegen diesen Spieler verloren. Zählt nur, wenn beim All-in der Gegner erfasst wurde.'],
+    ['🎯', 'Knockout-König', 'Meiste Knockouts: Ein Gegner ist in einem All-in-Duell gegen diesen Spieler ausgeschieden, egal wer All-in ging. Zählt nur, wenn der Gegner erfasst wurde.'],
     ['🧊', 'Mr. Konstant', 'Kleinste Schwankung der Ergebnisse (Standardabweichung des Nettos pro Abend). Erst ab 3 Abenden.']
   ]
 };
@@ -863,7 +881,10 @@ function sessionPdf(s) {
   d.y = 745;
   const info = [['Pot', chf(st.pot)], ['Spieler', String(st.players.length)]];
   if (s.noTime) info.push(['Zeit', 'nachgetragen, ohne Uhrzeiten']);
-  else info.push(['Zeit', `${fTime(s.start)} – ${s.end ? fTime(s.end) : 'läuft'}`], ['Dauer', fDur(st.dur)]);
+  else {
+    info.push(['Zeit', `${fTime(s.start)} – ${s.end ? fTime(s.end) : 'läuft'}`], ['Dauer', fDur(st.dur) + (st.pause >= 60000 ? ' (ohne Pausen)' : '')]);
+    if (st.pause >= 60000) info.push(['Pausen', fDur(st.pause)]);
+  }
   info.forEach(([k, v]) => { d.text(50, d.y, k, { size: 10, color: C_MU }); d.text(130, d.y, v, { size: 10, bold: true }); d.y -= 15; });
   if (st.diff !== 0) { d.y -= 4; d.text(50, d.y, `Achtung: Kontrollsumme stimmt nicht. Endbeträge ${chf(st.endSum)}, Buy-ins ${chf(st.pot)}, Differenz ${sgn(st.diff)}.`, { size: 9.5, color: C_NEG }); d.y -= 15; }
   d.heading('Resultat');
@@ -1121,20 +1142,40 @@ const A = {
     M = { m, opp: null };
     const others = s.players.filter(p => !p.left).map(p => p.memberId).filter(id => id !== m);
     modal(`<h2>All-in: ${esc(mName(m))}</h2><div class="lbl">Gegen wen? (optional, für Duell-Statistik)</div>${chipsHtml(others, new Set(), 'chip1')}
-      <div class="mbtns"><button class="btn blose big" data-a="allinSave" data-won="0">Verloren</button><button class="btn bwin big" data-a="allinSave" data-won="1">Gewonnen</button></div>
+      <div class="mbtns"><button class="btn bwin big" data-a="allinSave" data-won="1" data-bust="1">Gewonnen – Gegner raus</button><button class="btn bwin2 big" data-a="allinSave" data-won="1" data-bust="0">Gewonnen – Gegner noch Chips</button></div>
+      <div class="mbtns" style="margin-top:8px"><button class="btn blose big" data-a="allinSave" data-won="0" data-bust="1">Verloren – raus</button><button class="btn warn big" data-a="allinSave" data-won="0" data-bust="0">Verloren – noch Chips</button></div></div>
+      <div class="mu" style="margin:8px 2px 0">Raus oder noch Chips?${ib('bust')}</div>
       <button class="btn block" data-a="modalClose">Abbrechen</button>`);
   },
   allinSave(el) {
-    const s = S(cur().id), g = G(s.groupId), won = el.dataset.won === '1', m = M.m;
-    s.events.push({ id: uid(), t: Date.now(), type: 'allin', memberId: m, won, opp: M.opp || null });
+    const s = S(cur().id), g = G(s.groupId), won = el.dataset.won === '1', m = M.m, bust = el.dataset.bust === '1';
+    if (won && bust && !M.opp) return toast('Bitte oben den Gegner wählen, der raus ist.');
+    const ev = { id: uid(), t: Date.now(), type: 'allin', memberId: m, won, opp: M.opp || null };
+    if (won) ev.oppBust = bust; else ev.bust = bust;
+    s.events.push(ev);
     save(); closeModal(); render();
-    if (won) toast(`${mName(m)}: All-in gewonnen`);
-    else toast(`${mName(m)}: All-in verloren`, '+ Rebuy', () => { addBuy(s, m, g.buyIn); save(); render(); toast(`${mName(m)}: Rebuy ${chf(g.buyIn)}`); });
+    const o = ev.opp;
+    if (won && bust) toast(`${mName(m)} gewinnt, ${mName(o)} ist raus`, `+ Rebuy ${mName(o)}`, () => { addBuy(s, o, g.buyIn); save(); render(); toast(`${mName(o)}: Rebuy ${chf(g.buyIn)}`); });
+    else if (won) toast(`${mName(m)}: All-in gewonnen`);
+    else if (!ev.bust) toast(`${mName(m)}: All-in verloren, noch Chips`);
+    else toast(`${mName(m)}: All-in verloren, raus`, '+ Rebuy', () => { addBuy(s, m, g.buyIn); save(); render(); toast(`${mName(m)}: Rebuy ${chf(g.buyIn)}`); });
   },
   delEvent(el) {
     const s = S(cur().id);
     if (!confirm('Eintrag löschen?')) return;
     s.events = s.events.filter(e => e.id !== el.dataset.id); save(); render();
+  },
+  pause() {
+    const s = S(cur().id);
+    (s.pauses || (s.pauses = [])).push({ from: Date.now(), to: null });
+    save(); render(); window.scrollTo(0, 0); toast('Pause gestartet');
+  },
+  resume() {
+    const s = S(cur().id), p = (s.pauses || []).find(x => !x.to);
+    if (!p) return;
+    p.to = Date.now();
+    if (p.to - p.from < 60000) s.pauses = s.pauses.filter(x => x !== p);
+    save(); render(); toast(`Weiter nach ${fDur(p.to - p.from)} Pause`);
   },
   endSession() { go({ v: 'settle', id: cur().id }); },
   editEnds() { closeModal(); go({ v: 'settle', id: cur().id }); },
@@ -1149,12 +1190,13 @@ const A = {
     const sum = Object.values(vals).reduce((a, v) => a + (v || 0), 0);
     if (sum !== st.pot && !confirm(`Kontrollsumme stimmt nicht (Differenz ${sgn(sum - st.pot)}). Trotzdem speichern?`)) return;
     s.players.forEach(p => { p.end = vals[p.memberId] || 0; });
-    if (s.status !== 'closed') { s.status = 'closed'; s.end = s.noTime ? s.start : Date.now(); }
+    if (s.status !== 'closed') { s.status = 'closed'; s.end = s.noTime ? s.start : Date.now(); (s.pauses || []).forEach(p => { if (!p.to) p.to = s.end; }); }
     save(); stack.pop(); render(); window.scrollTo(0, 0);
   },
   reopen() {
     const s = S(cur().id);
     if (!confirm('Abend wieder öffnen? Die Endbeträge bleiben als Vorschlag erhalten.')) return;
+    if (s.end && !s.noTime && Date.now() - s.end >= 60000) (s.pauses || (s.pauses = [])).push({ from: s.end, to: Date.now() });
     s.status = 'open'; s.end = null; save(); closeModal(); render();
   },
   editTimes() {
@@ -1171,7 +1213,7 @@ const A = {
   },
   timesSave() {
     const s = S(cur().id);
-    const all = f => { s.events.forEach(e => e.t = f(e.t)); s.players.forEach(p => { if (p.joined) p.joined = f(p.joined); if (p.left) p.left = f(p.left); }); };
+    const all = f => { s.events.forEach(e => e.t = f(e.t)); s.players.forEach(p => { if (p.joined) p.joined = f(p.joined); if (p.left) p.left = f(p.left); }); (s.pauses || []).forEach(p => { p.from = f(p.from); if (p.to) p.to = f(p.to); }); };
     if (s.noTime) {
       const dv = document.querySelector('[data-f=tDate]').value;
       const st = dv ? new Date(dv + 'T20:00').getTime() : NaN;
@@ -1187,7 +1229,7 @@ const A = {
     if (en != null && en <= st) return toast('Ende muss nach dem Start liegen.');
     if (en == null && st > Date.now()) return toast('Start darf nicht in der Zukunft liegen.');
     const os = s.start, oe = s.end || Date.now(), ne = en != null ? en : Date.now();
-    const ts = s.events.map(e => e.t).concat(s.players.map(p => p.joined).filter(Boolean), s.players.map(p => p.left).filter(Boolean));
+    const ts = s.events.map(e => e.t).concat(s.players.map(p => p.joined).filter(Boolean), s.players.map(p => p.left).filter(Boolean), (s.pauses || []).flatMap(p => [p.from, p.to].filter(Boolean)));
     if (ts.every(x => x >= st && x <= ne)) {
       all(x => x === os ? st : x);
     } else {
@@ -1281,7 +1323,7 @@ document.addEventListener('input', ev => { if (ev.target.classList.contains('end
 setInterval(() => {
   const c = cur(); if (c.v !== 'session') return;
   const s = S(c.id); if (!s || s.status !== 'open') return;
-  const d = document.querySelector('[data-dur]'); if (d) d.textContent = fDur(Date.now() - s.start);
+  const d = document.querySelector('[data-dur]'); if (d) d.textContent = fDur(sessStats(s).dur);
 }, 30000);
 
 window.addEventListener('resize', measure);
