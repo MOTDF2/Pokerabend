@@ -140,7 +140,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.10';
+const APP_VERSION = '1.11';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -272,7 +272,7 @@ function nightTitlesData(st) {
   const P = st.players.filter(p => p.net != null);
   const q = p => p.allinWins / p.allins;
   const ai2 = P.filter(p => p.allins >= 2);
-  const lucky = best(ai2, q, 1), unlucky = best(ai2, q, -1);
+  const lucky = best(ai2.filter(p => q(p) > 0.5), q, 1), unlucky = best(ai2.filter(p => q(p) < 0.5), q, -1);
   const r = [
     titleData('🦈', 'Haifisch', best(P.filter(p => p.net > 0), p => p.net, 1), p => sgn(p.net)),
     titleData('👑', 'Comeback-König', best(P.filter(p => p.net > 0 && p.rebuys > 0), p => p.net, 1), p => `${p.rebuys} Rebuy${p.rebuys > 1 ? 's' : ''}`),
@@ -280,7 +280,7 @@ function nightTitlesData(st) {
     titleData('💥', 'Kamikaze', best(P.filter(p => p.allins > 0), p => p.allins, 1), p => `${p.allins} All-in${p.allins > 1 ? 's' : ''}`),
     titleData('🍀', 'Glückspilz', lucky, p => pct(p.allinWins, p.allins))
   ];
-  if (lucky.length && unlucky.length && q(unlucky[0]) < q(lucky[0])) r.push(titleData('🌧️', 'Pechvogel', unlucky, p => pct(p.allinWins, p.allins)));
+  if (unlucky.length) r.push(titleData('🌧️', 'Pechvogel', unlucky, p => pct(p.allinWins, p.allins)));
   return r.filter(Boolean);
 }
 function nightTitles(st) {
@@ -662,16 +662,16 @@ const TITLE_INFO = {
     ['👑', 'Comeback-König', 'Höchster Gewinn unter den Spielern, die mindestens einen Rebuy gebraucht haben.'],
     ['🏧', 'Bankautomat', 'Meiste Rebuys des Abends.'],
     ['💥', 'Kamikaze', 'Meiste All-ins des Abends.'],
-    ['🍀', 'Glückspilz', 'Beste All-in-Quote (Anteil gewonnener All-ins). Erst ab 2 All-ins.'],
-    ['🌧️', 'Pechvogel', 'Schlechteste All-in-Quote, ab 2 All-ins. Erscheint nur, wenn sie tiefer ist als die des Glückspilzes.']
+    ['🍀', 'Glückspilz', 'Beste All-in-Quote (Anteil gewonnener All-ins), über 50 %. Erst ab 2 All-ins.'],
+    ['🌧️', 'Pechvogel', 'Schlechteste All-in-Quote, unter 50 %. Erst ab 2 All-ins.']
   ],
   group: [
     ['🦈', 'Haifisch', 'Höchste Gesamtbilanz über alle Abende.'],
     ['🏆', 'Meiste Abende im Plus', 'Am häufigsten mit Gewinn nach Hause gegangen.'],
     ['🏧', 'Bankautomat', 'Meiste Rebuys pro Abend im Durchschnitt.'],
     ['💥', 'Kamikaze', 'Meiste All-ins pro Abend im Durchschnitt.'],
-    ['🍀', 'Glückspilz', 'Beste All-in-Quote über alle Abende. Erst ab 5 All-ins.'],
-    ['🌧️', 'Pechvogel', 'Schlechteste All-in-Quote, ab 5 All-ins. Erscheint nur, wenn sie tiefer ist als die des Glückspilzes.'],
+    ['🍀', 'Glückspilz', 'Beste All-in-Quote über alle Abende, über 50 %. Erst ab 5 All-ins.'],
+    ['🌧️', 'Pechvogel', 'Schlechteste All-in-Quote über alle Abende, unter 50 %. Erst ab 5 All-ins.'],
     ['🎯', 'Knockout-König', 'Meiste Knockouts: Ein Gegner ist in einem All-in-Duell gegen diesen Spieler ausgeschieden, egal wer All-in ging. Zählt nur, wenn der Gegner erfasst wurde.'],
     ['🧊', 'Mr. Konstant', 'Kleinste Schwankung der Ergebnisse (Standardabweichung des Nettos pro Abend). Erst ab 3 Abenden.']
   ]
@@ -680,7 +680,7 @@ const TITLE_INFO = {
 function groupTitlesData(X) {
   const A = X.arr, qa = q => q.allinWins / q.allins, r1 = v => (Math.round(v * 10) / 10).toLocaleString('de-CH');
   const a5 = A.filter(q => q.allins >= 5);
-  const lk = best(a5, qa, 1), ul = best(a5, qa, -1);
+  const lk = best(a5.filter(q => qa(q) > 0.5), qa, 1), ul = best(a5.filter(q => qa(q) < 0.5), qa, -1);
   const r = [
     titleData('🦈', 'Haifisch (höchste Bilanz)', best(A.filter(q => q.total > 0), q => q.total, 1), q => sgn(q.total)),
     titleData('🏆', 'Meiste Abende im Plus', best(A.filter(q => q.wins > 0), q => q.wins, 1), q => q.wins + '×'),
@@ -688,7 +688,7 @@ function groupTitlesData(X) {
     titleData('💥', 'Kamikaze (All-ins/Abend)', best(A.filter(q => q.allins > 0), q => q.allins / q.nights, 1), q => r1(q.allins / q.nights)),
     titleData('🍀', 'Glückspilz (ab 5 All-ins)', lk, q => pct(q.allinWins, q.allins))
   ];
-  if (lk.length && ul.length && qa(ul[0]) < qa(lk[0])) r.push(titleData('🌧️', 'Pechvogel (ab 5 All-ins)', ul, q => pct(q.allinWins, q.allins)));
+  if (ul.length) r.push(titleData('🌧️', 'Pechvogel (ab 5 All-ins)', ul, q => pct(q.allinWins, q.allins)));
   r.push(titleData('🎯', 'Knockout-König', best(A.filter(q => q.ko > 0), q => q.ko, 1), q => q.ko + ' KOs'));
   r.push(titleData('🧊', 'Mr. Konstant (ab 3 Abenden)', best(A.filter(q => q.sd != null && q.nights >= 3), q => q.sd, -1), q => '± ' + NF.format(q.sd / 100)));
   return r.filter(Boolean);
