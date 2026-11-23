@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pokerrunde-v5';
+const CACHE_NAME = 'pokerrunde-v7';
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

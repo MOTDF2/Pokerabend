@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Pokerrunde">
 <meta name="theme-color" content="#14532d">
 <link rel="manifest" href="manifest.json">
@@ -16,7 +16,7 @@
 :root{--bg:#f2f5f3;--card:#fff;--tx:#15221b;--mu:#5d6b63;--bd:#dde4df;--pri:#166534;--pos:#15803d;--neg:#b91c1c;--hdr:#14532d;--chip:#e6eee9}
 @media (prefers-color-scheme:dark){:root{--bg:#0e1411;--card:#18211c;--tx:#e6ece8;--mu:#9aa8a0;--bd:#2a3630;--pri:#15803d;--pos:#4ade80;--neg:#f87171;--hdr:#0f3d22;--chip:#22302a}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-html{-webkit-text-size-adjust:100%;min-height:calc(100% + env(safe-area-inset-top));background:var(--hdr)}
+html{-webkit-text-size-adjust:100%;min-height:100%;background:var(--bg)}
 body::before{content:'';position:fixed;left:0;right:0;top:0;bottom:-200px;background:var(--bg);z-index:-1}
 body{margin:0;font-family:'Aptos','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--tx);font-size:15px;line-height:1.4;
  padding-top:calc(var(--hh,60px) + 10px);padding-bottom:calc(var(--fh,64px) + 16px);
@@ -111,6 +111,7 @@ tr:last-child td{border-bottom:0}
 details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14px}
 .card.gone{opacity:.75;background:var(--chip)}
 .sum>div{flex:1}.sum b{font-size:15px}
+.info{font:inherit;font-size:13px;border:1px solid var(--bd);background:var(--card);color:var(--pri);border-radius:12px;padding:1px 9px;margin-left:6px;cursor:pointer;text-transform:none;letter-spacing:0;vertical-align:1px}
 .note{font-size:12px;color:var(--mu);margin:6px 2px}
 </style>
 </head>
@@ -131,7 +132,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.6';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -554,7 +555,7 @@ function resultHtml(s) {
   h += tx.length ? tx.map(t => `<div class="li"><span class="grow">${esc(mName(t.from))} → <b>${esc(mName(t.to))}</b></span><span class="num">${chf(t.v)}</span></div>`).join('') : `<div class="li mu">Kein Ausgleich nötig.</div>`;
   h += `</div><div class="note">Gilt, wenn die Buy-ins nicht bar in eine gemeinsame Kasse bezahlt wurden.</div>`;
   const tt = nightTitles(st);
-  if (tt) h += `<h3>Titel des Abends</h3><div class="card list">${tt}</div>`;
+  if (tt) h += `<h3>Titel des Abends<button class="info" data-a="titleInfo" data-k="night" aria-label="Erklärung">ⓘ Info</button></h3><div class="card list">${tt}</div>`;
   h += `<h3>Details</h3><div class="card tw"><table><tr><th>Spieler</th><th>Rebuys</th><th>All-ins</th><th>gewonnen</th><th>CHF/h</th><th>bis Rebuy</th></tr>`;
   P.forEach(p => {
     h += `<tr><td>${esc(mName(p.id))}</td><td>${p.rebuys}</td><td>${p.allins}</td><td>${pct(p.allinWins, p.allins)}</td><td class="${cls(p.net)}">${p.net != null && p.hours > 0 ? sgn(Math.round(p.net / p.hours)) : '–'}</td><td>${p.ttr ? fDur(p.ttr) : '–'}</td></tr>`;
@@ -593,7 +594,7 @@ function statsHtml(g) {
 
   const A = X.arr;
   const t = groupTitlesData(X).map(x => `<div class="li"><span class="ico">${x.icon}</span><span class="grow"><b>${esc(x.name)}</b><div class="mu">${esc(x.who)}</div></span><span class="num">${x.val}</span></div>`).join('');
-  if (t) h += `<h3>Titel (alle Abende)</h3><div class="card list">${t}</div>`;
+  if (t) h += `<h3>Titel (alle Abende)<button class="info" data-a="titleInfo" data-k="group" aria-label="Erklärung">ⓘ Info</button></h3><div class="card list">${t}</div>`;
 
   const hasDuels = Object.keys(X.beats).length > 0;
   if (hasDuels) {
@@ -613,6 +614,27 @@ function statsHtml(g) {
   }
   return h;
 }
+
+const TITLE_INFO = {
+  night: [
+    ['🦈', 'Haifisch', 'Höchster Gewinn (Netto) des Abends. Nur wer im Plus ist.'],
+    ['👑', 'Comeback-König', 'Höchster Gewinn unter den Spielern, die mindestens einen Rebuy gebraucht haben.'],
+    ['🏧', 'Bankautomat', 'Meiste Rebuys des Abends.'],
+    ['💥', 'Kamikaze', 'Meiste All-ins des Abends.'],
+    ['🍀', 'Glückspilz', 'Beste All-in-Quote (Anteil gewonnener All-ins). Erst ab 2 All-ins.'],
+    ['🌧️', 'Pechvogel', 'Schlechteste All-in-Quote, ab 2 All-ins. Erscheint nur, wenn sie tiefer ist als die des Glückspilzes.']
+  ],
+  group: [
+    ['🦈', 'Haifisch', 'Höchste Gesamtbilanz über alle Abende.'],
+    ['🏆', 'Meiste Abende im Plus', 'Am häufigsten mit Gewinn nach Hause gegangen.'],
+    ['🏧', 'Bankautomat', 'Meiste Rebuys pro Abend im Durchschnitt.'],
+    ['💥', 'Kamikaze', 'Meiste All-ins pro Abend im Durchschnitt.'],
+    ['🍀', 'Glückspilz', 'Beste All-in-Quote über alle Abende. Erst ab 5 All-ins.'],
+    ['🌧️', 'Pechvogel', 'Schlechteste All-in-Quote, ab 5 All-ins. Erscheint nur, wenn sie tiefer ist als die des Glückspilzes.'],
+    ['🎯', 'Knockout-König', 'Meiste Knockouts: Ein Gegner hat sein All-in gegen diesen Spieler verloren. Zählt nur, wenn beim All-in der Gegner erfasst wurde.'],
+    ['🧊', 'Mr. Konstant', 'Kleinste Schwankung der Ergebnisse (Standardabweichung des Nettos pro Abend). Erst ab 3 Abenden.']
+  ]
+};
 
 function groupTitlesData(X) {
   const A = X.arr, qa = q => q.allinWins / q.allins, r1 = v => (Math.round(v * 10) / 10).toLocaleString('de-CH');
@@ -1184,6 +1206,12 @@ const A = {
     save(); closeModal(); render();
   },
 
+  titleInfo(el) {
+    const k = el.dataset.k;
+    modal(`<h2>${k === 'night' ? 'Titel des Abends' : 'Titel über alle Abende'}</h2><div class="card list">` +
+      TITLE_INFO[k].map(([i, n, d]) => `<div class="li"><span class="ico">${i}</span><span class="grow"><b>${n}</b><div class="mu">${d}</div></span></div>`).join('') +
+      `</div><div class="note">Bei Gleichstand erhalten alle Betroffenen den Titel. Ein Titel erscheint nur, wenn die Bedingung erfüllt ist.</div><button class="btn block" data-a="modalClose">Schliessen</button>`);
+  },
   exportPdf() {
     const s = S(cur().id), g = G(s.groupId);
     closeModal();
