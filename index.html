@@ -140,7 +140,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.11';
+const APP_VERSION = '1.12';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -1289,7 +1289,7 @@ const A = {
     const s = S(cur().id), g = G(s.groupId);
     closeModal();
     const d = new Date(s.start);
-    const name = `Pokerabend-${(g ? g.name : '').replace(/[^\wäöüÄÖÜ-]+/g, '_')}-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.pdf`;
+    const name = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${(g ? g.name : 'Pokerabend').trim().replace(/[^\wäöüÄÖÜéèàç-]+/g, '_')}.pdf`;
     try { shareOrDownload(sessionPdf(s), name, 'application/pdf'); }
     catch (e) { console.error(e); alert('PDF-Export fehlgeschlagen: ' + e.message); }
   },
