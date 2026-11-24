@@ -128,6 +128,12 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 .chhead{font-size:12px;color:var(--mu);margin-bottom:-2px}
 .chhead span:nth-child(3),.chhead span:nth-child(4){text-align:right}
 .chrow input[data-c=value],.chrow input[data-c=count]{text-align:right}
+.chipbtn{background:none;border:0;padding:0;width:40px;height:40px;cursor:pointer;border-radius:50%}
+.chipname{font-size:15px}
+.cpick{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
+.cpick button{background:var(--card);border:2px solid var(--bd);border-radius:14px;padding:8px 2px 6px;font:inherit;font-size:12px;color:var(--tx);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px}
+.cpick button.on{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri)}
+.cpick button:disabled{opacity:.35;cursor:default}
 .sub{color:var(--mu);font-size:13px;margin:-2px 2px 10px}
 .note{font-size:12px;color:var(--mu);margin:6px 2px}
 </style>
@@ -149,7 +155,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.16';
+const APP_VERSION = '1.17';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -219,26 +225,53 @@ const S = id => D.sessions.find(s => s.id === id);
 const sortIds = ids => ids.slice().sort((a, b) => mName(a).localeCompare(mName(b), 'de'));
 
 /* ---------- Gruppen-Standardwerte ---------- */
-const DEFAULT_CHIPS = () => [
-  { name: 'Blau', hex: '#2563eb', value: 10, count: 10 },
-  { name: 'Rot', hex: '#dc2626', value: 20, count: 10 },
-  { name: 'Weiss', hex: '#f8fafc', value: 50, count: 10 },
-  { name: 'Grün', hex: '#16a34a', value: 100, count: 6 },
-  { name: 'Schwarz', hex: '#111827', value: 200, count: 3 }
-];
+const CHIP_COLORS = {
+  blau: { name: 'Blau', hex: '#1d4ed8', stripe: '#ffffff', edge: '#1e3a8a' },
+  rot: { name: 'Rot', hex: '#dc2626', stripe: '#ffffff', edge: '#7f1d1d' },
+  weiss: { name: 'Weiss', hex: '#f8fafc', stripe: '#2563eb', edge: '#94a3b8' },
+  gruen: { name: 'Grün', hex: '#15803d', stripe: '#ffffff', edge: '#14532d' },
+  schwarz: { name: 'Schwarz', hex: '#111827', stripe: '#ffffff', edge: '#000000' }
+};
+const CHIP_KEYS = Object.keys(CHIP_COLORS);
+const mkChip = (color, value, count) => ({ color, name: CHIP_COLORS[color].name, hex: CHIP_COLORS[color].hex, value, count });
+const DEFAULT_CHIPS = () => [mkChip('blau', 10, 10), mkChip('rot', 20, 10), mkChip('weiss', 50, 10), mkChip('gruen', 100, 6), mkChip('schwarz', 200, 3)];
+function chipKey(c) {
+  if (c.color && CHIP_COLORS[c.color]) return c.color;
+  const n = String(c.name || '').toLowerCase().replace('ü', 'ue');
+  const byName = CHIP_KEYS.find(k => n.startsWith(k));
+  if (byName) return byName;
+  const legacy = { '#2563eb': 'blau', '#dc2626': 'rot', '#f8fafc': 'weiss', '#16a34a': 'gruen', '#111827': 'schwarz' };
+  return legacy[String(c.hex || '').toLowerCase()] || null;
+}
+function normChips(chips) {
+  const used = new Set(), out = [];
+  (chips || []).forEach(c => {
+    let k = chipKey(c);
+    if (!k || used.has(k)) k = CHIP_KEYS.find(x => !used.has(x));
+    if (!k) return;
+    used.add(k); out.push(mkChip(k, c.value, c.count));
+  });
+  return out.sort((a, b) => a.value - b.value);
+}
 function groupDefaults(g) {
   if (g.sb == null) g.sb = 10;
   if (g.bb == null) g.bb = 20;
-  if (!Array.isArray(g.chips)) g.chips = DEFAULT_CHIPS();
+  g.chips = Array.isArray(g.chips) ? normChips(g.chips) : DEFAULT_CHIPS();
   return g;
 }
+function chipSvg(key, size) {
+  const c = CHIP_COLORS[key] || CHIP_COLORS.blau;
+  let s = `<svg viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true" style="vertical-align:middle;flex:none"><circle cx="20" cy="20" r="19" fill="${c.hex}" stroke="${c.edge}" stroke-width="1"/><g fill="${c.stripe}">`;
+  for (let k = 0; k < 6; k++) s += `<rect x="17" y="1.2" width="6" height="6.5" rx="1" transform="rotate(${k * 60} 20 20)"/>`;
+  return s + `</g><circle cx="20" cy="20" r="12.8" fill="none" stroke="${c.stripe}" stroke-width="1.4" stroke-dasharray="3.2 2.2"/><circle cx="20" cy="20" r="10.3" fill="${c.hex}" stroke="${c.edge}" stroke-width=".6"/></svg>`;
+}
 const chipSum = chips => (chips || []).reduce((a, c) => a + c.value * c.count, 0);
-const sw = hex => `<span class="sw" style="background:${esc(hex)}"></span>`;
+const chipLbl = c => { const k = chipKey(c) || 'blau'; return `${chipSvg(k, 22)} ${esc(CHIP_COLORS[k].name)}`; };
 const amtShort = c => c % 100 === 0 ? String(c / 100) : NF.format(c / 100);
 function chipTable(chips, n, buyIn) {
   const sum = chipSum(chips), cnt = chips.reduce((a, c) => a + c.count, 0);
   let h = `<div class="card tw"><table><tr><th>Chip</th><th>Wert</th><th>pro Spieler</th><th>gesamt</th></tr>`;
-  chips.forEach(c => { h += `<tr><td>${sw(c.hex)}${esc(c.name)}</td><td>${NF.format(c.value / 100)}</td><td>${c.count} Stk</td><td>${c.count * n} Stk</td></tr>`; });
+  chips.forEach(c => { h += `<tr><td>${chipLbl(c)}</td><td>${NF.format(c.value / 100)}</td><td>${c.count} Stk</td><td>${c.count * n} Stk</td></tr>`; });
   h += `<tr><td><b>Total</b></td><td></td><td><b>${cnt} Stk</b></td><td><b>${cnt * n} Stk</b></td></tr>
     <tr><td><b>Wert</b></td><td></td><td><b>${NF.format(sum / 100)}</b></td><td><b>${NF.format(sum * n / 100)}</b></td></tr></table></div>`;
   if (buyIn != null && sum !== buyIn) h += `<div class="banner err">Chipwert pro Spieler (${chf(sum)}) entspricht nicht dem Buy-in (${chf(buyIn)}).</div>`;
@@ -541,9 +574,9 @@ function groupSettingsHtml(g) {
     <div class="row"><label class="grow">Small Blind (CHF)<input inputmode="decimal" data-g="sb" value="${amtIn(g.sb)}"></label>
     <label class="grow">Big Blind (CHF)<input inputmode="decimal" data-g="bb" value="${amtIn(g.bb)}"></label></div>
     <div class="mu">Änderungen werden automatisch gespeichert.</div></div>`;
-  h += `<h3>Chips pro Spieler${ib('chips')}</h3><div class="card"><div class="chrow chhead"><span>Farbe</span><span>Name</span><span>Wert CHF</span><span>Anzahl</span><span></span></div>`;
+  h += `<h3>Chips pro Spieler${ib('chips')}</h3><div class="card"><div class="chrow chhead"><span>Chip</span><span></span><span>Wert CHF</span><span>Anzahl</span><span></span></div>`;
   g.chips.forEach((c, i) => {
-    h += `<div class="chrow"><input type="color" data-c="hex" data-i="${i}" value="${esc(c.hex)}"><input type="text" data-c="name" data-i="${i}" value="${esc(c.name)}">
+    h += `<div class="chrow"><button class="chipbtn" data-a="chipPick" data-i="${i}" aria-label="Farbe wählen">${chipSvg(c.color, 38)}</button><span class="chipname">${esc(c.name)}</span>
       <input inputmode="decimal" data-c="value" data-i="${i}" value="${amtIn(c.value)}"><input inputmode="numeric" data-c="count" data-i="${i}" value="${c.count}">
       <button class="ibtn" data-a="chipDel" data-i="${i}" aria-label="Chip löschen">✕</button></div>`;
   });
@@ -722,7 +755,7 @@ const HELP = {
   bust: 'Raus = keine Chips mehr. Wer jemanden rauswirft, erhält einen Knockout, egal wer All-in ging. Noch Chips = der Verlierer hatte mehr Chips und bleibt im Spiel. Für die Duell-Statistik zählt jedes gewonnene oder verlorene All-in. «Gegner raus» braucht einen gewählten Gegner.',
   pause: 'Während der Pause steht die Spielzeit still. Dauer, CHF/h, Zeit am Tisch und Zeit bis Rebuy werden ohne Pausen gerechnet. Buy-ins und All-ins können trotzdem erfasst werden.',
   update: 'Neue Versionen erscheinen beim nächsten Öffnen der App. Nach einem Upload auf GitHub kann es einige Minuten dauern, bis GitHub die neue Version ausliefert. «Nach Update suchen» prüft sofort und lädt die neue Version. Die Daten bleiben dabei erhalten.',
-  chips: 'Startchips pro Spieler: Farbe, Wert und Anzahl. Die Summe pro Spieler sollte dem Buy-in entsprechen. Ändert sich ein Wert, werden die Chips nach Wert sortiert. Ein neuer Abend übernimmt die aktuelle Einstellung, spätere Änderungen betreffen ihn nicht.',
+  chips: 'Startchips pro Spieler: Farbe (Chip antippen), Wert und Anzahl. Es gibt 5 Farben, jede kann nur einmal vergeben werden. Die Summe pro Spieler sollte dem Buy-in entsprechen. Ändert sich ein Wert, werden die Chips nach Wert sortiert. Ein neuer Abend übernimmt die aktuelle Einstellung, spätere Änderungen betreffen ihn nicht.',
   ties: 'Bei Gleichstand erhalten alle Betroffenen den Titel. Ein Titel erscheint nur, wenn die Bedingung erfüllt ist.'
 };
 const ib = k => `<button class="ib" data-a="help" data-k="${k}" aria-label="Info">ⓘ</button>`;
@@ -1080,10 +1113,27 @@ const A = {
   },
   chipAdd() {
     const g = groupDefaults(G(cur().id));
+    const free = CHIP_KEYS.find(k => !g.chips.some(c => c.color === k));
+    if (!free) return toast('Alle 5 Chipfarben sind bereits vergeben.');
     const top = g.chips.length ? g.chips[g.chips.length - 1].value : 50;
-    g.chips.push({ name: 'Neu', hex: '#9333ea', value: top * 2, count: 0 });
+    g.chips.push(mkChip(free, top * 2, 0));
     g.chips.sort((a, b) => a.value - b.value);
     save(); render();
+  },
+  chipPick(el) {
+    const g = groupDefaults(G(cur().id)), i = Number(el.dataset.i), c = g.chips[i];
+    if (!c) return;
+    M = { chipI: i };
+    modal(`<h2>Chipfarbe wählen</h2><div class="sub">Wert ${NF.format(c.value / 100)} · jede Farbe nur einmal</div><div class="cpick">` +
+      CHIP_KEYS.map(k => { const used = g.chips.some((x, j) => j !== i && x.color === k);
+        return `<button class="${c.color === k ? 'on' : ''}" data-a="chipSet" data-k="${k}" ${used ? 'disabled' : ''}>${chipSvg(k, 44)}${CHIP_COLORS[k].name}</button>`; }).join('') +
+      `</div><button class="btn block" data-a="modalClose">Abbrechen</button>`);
+  },
+  chipSet(el) {
+    const g = groupDefaults(G(cur().id)), c = g.chips[M.chipI], k = el.dataset.k;
+    if (!c || !CHIP_COLORS[k] || g.chips.some(x => x !== c && x.color === k)) return;
+    Object.assign(c, { color: k, name: CHIP_COLORS[k].name, hex: CHIP_COLORS[k].hex });
+    save(); closeModal(); render();
   },
   chipDel(el) {
     const g = groupDefaults(G(cur().id)), c = g.chips[Number(el.dataset.i)];
@@ -1301,7 +1351,7 @@ const A = {
   },
   showChips() {
     const s = S(cur().id), g = groupDefaults(G(s.groupId));
-    const chips = s.chips || g.chips, n = s.players.filter(p => !p.left).length;
+    const chips = normChips(s.chips || g.chips), n = s.players.filter(p => !p.left).length;
     const bl = s.blinds || { sb: g.sb, bb: g.bb };
     modal(`<h2>Chipaufteilung</h2><div class="sub">${n} Spieler am Tisch · Blinds ${NF.format(bl.sb / 100)} / ${NF.format(bl.bb / 100)}</div>
       ${chips.length ? chipTable(chips, n, g.buyIn) : '<div class="mu">Keine Chips definiert.</div>'}
@@ -1472,9 +1522,7 @@ document.addEventListener('change', ev => {
     }
     const i = Number(el.dataset.i), ch = g.chips[i], k = el.dataset.c;
     if (!ch) return;
-    if (k === 'name') { ch.name = el.value.trim() || ch.name; el.value = ch.name; }
-    else if (k === 'hex') ch.hex = el.value;
-    else if (k === 'count') {
+    if (k === 'count') {
       const v = Math.round(Number(el.value.replace(',', '.')));
       if (!isFinite(v) || v < 0) { toast('Ungültige Anzahl.'); el.value = ch.count; return; }
       ch.count = v; el.value = v;
