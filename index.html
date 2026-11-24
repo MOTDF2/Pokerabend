@@ -121,6 +121,14 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 .sbtn{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:9px;padding:9px 10px;min-height:38px;color:#fff;cursor:pointer;white-space:nowrap}
 .sbtn.pri{background:var(--pri)}.sbtn.warn{background:#b45309}.sbtn:active{opacity:.75}
 .pc .row{gap:6px}.pc .ttl{font-size:15px}
+.sw{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid var(--bd);vertical-align:-4px;margin-right:6px;box-shadow:inset 0 0 0 3px rgba(255,255,255,.35)}
+.chrow{display:grid;grid-template-columns:40px 1fr 74px 62px 30px;gap:6px;align-items:center;margin:6px 0}
+.chrow input{padding:8px;margin:0}
+.chrow input[type=color]{width:40px;height:40px;padding:2px;border:1px solid var(--bd);border-radius:10px;background:var(--card)}
+.chhead{font-size:12px;color:var(--mu);margin-bottom:-2px}
+.chhead span:nth-child(3),.chhead span:nth-child(4){text-align:right}
+.chrow input[data-c=value],.chrow input[data-c=count]{text-align:right}
+.sub{color:var(--mu);font-size:13px;margin:-2px 2px 10px}
 .note{font-size:12px;color:var(--mu);margin:6px 2px}
 </style>
 </head>
@@ -141,7 +149,7 @@ details>summary{cursor:pointer;color:var(--mu);margin:16px 2px 8px;font-size:14p
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script>
 'use strict';
-const APP_VERSION = '1.15';
+const APP_VERSION = '1.16';
 const BACKUP_DAYS = 365;
 const COL = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#475569','#ea580c'];
 
@@ -209,6 +217,34 @@ const isArch = id => !!(D.members.find(m => m.id === id) || {}).archived;
 const G = id => D.groups.find(g => g.id === id);
 const S = id => D.sessions.find(s => s.id === id);
 const sortIds = ids => ids.slice().sort((a, b) => mName(a).localeCompare(mName(b), 'de'));
+
+/* ---------- Gruppen-Standardwerte ---------- */
+const DEFAULT_CHIPS = () => [
+  { name: 'Blau', hex: '#2563eb', value: 10, count: 10 },
+  { name: 'Rot', hex: '#dc2626', value: 20, count: 10 },
+  { name: 'Weiss', hex: '#f8fafc', value: 50, count: 10 },
+  { name: 'Grün', hex: '#16a34a', value: 100, count: 6 },
+  { name: 'Schwarz', hex: '#111827', value: 200, count: 3 }
+];
+function groupDefaults(g) {
+  if (g.sb == null) g.sb = 10;
+  if (g.bb == null) g.bb = 20;
+  if (!Array.isArray(g.chips)) g.chips = DEFAULT_CHIPS();
+  return g;
+}
+const chipSum = chips => (chips || []).reduce((a, c) => a + c.value * c.count, 0);
+const sw = hex => `<span class="sw" style="background:${esc(hex)}"></span>`;
+const amtShort = c => c % 100 === 0 ? String(c / 100) : NF.format(c / 100);
+function chipTable(chips, n, buyIn) {
+  const sum = chipSum(chips), cnt = chips.reduce((a, c) => a + c.count, 0);
+  let h = `<div class="card tw"><table><tr><th>Chip</th><th>Wert</th><th>pro Spieler</th><th>gesamt</th></tr>`;
+  chips.forEach(c => { h += `<tr><td>${sw(c.hex)}${esc(c.name)}</td><td>${NF.format(c.value / 100)}</td><td>${c.count} Stk</td><td>${c.count * n} Stk</td></tr>`; });
+  h += `<tr><td><b>Total</b></td><td></td><td><b>${cnt} Stk</b></td><td><b>${cnt * n} Stk</b></td></tr>
+    <tr><td><b>Wert</b></td><td></td><td><b>${NF.format(sum / 100)}</b></td><td><b>${NF.format(sum * n / 100)}</b></td></tr></table></div>`;
+  if (buyIn != null && sum !== buyIn) h += `<div class="banner err">Chipwert pro Spieler (${chf(sum)}) entspricht nicht dem Buy-in (${chf(buyIn)}).</div>`;
+  return h;
+}
+function locOf(s) { return s.location ? ' · ' + esc(s.location) : ''; }
 
 /* ---------- Berechnungen ---------- */
 function pausedMs(s, a, b) {
@@ -478,7 +514,7 @@ function nightsHtml(g) {
       if (s.noTime) info += ' · nachgetragen';
       if (w.length) info += ` · 🦈 ${esc(w.map(p => mName(p.id)).join(', '))} ${sgn(w[0].net)}`;
     }
-    h += `<div class="card tap" data-a="openSession" data-id="${s.id}"><div class="row"><div class="grow"><div class="ttl">${fDate(s.start)}</div><div class="mu">${info}</div></div>
+    h += `<div class="card tap" data-a="openSession" data-id="${s.id}"><div class="row"><div class="grow"><div class="ttl">${fDate(s.start)}${locOf(s)}</div><div class="mu">${info}</div></div>
       ${s.status === 'open' ? '<span class="badge live">läuft</span>' : (st.diff !== 0 ? '<span class="badge" style="color:var(--neg)">Differenz</span>' : '')}<span class="chev">›</span></div></div>`;
   });
   return h;
@@ -498,20 +534,45 @@ function groupMembersHtml(g) {
 }
 
 function groupSettingsHtml(g) {
-  return `<div class="card"><label>Gruppenname<input type="text" data-f="gName" value="${esc(g.name)}"></label>
-    <label>Standard-Buy-in (CHF)<input inputmode="decimal" data-f="gBuy" value="${amtIn(g.buyIn)}"></label>
-    <button class="btn pri block" data-a="gSave">Speichern</button></div>
-    <button class="btn block" data-a="exportCsv">Abende als CSV exportieren (Excel)</button>
+  groupDefaults(g);
+  const sum = chipSum(g.chips);
+  let h = `<div class="card"><label>Gruppenname<input type="text" data-g="name" value="${esc(g.name)}"></label>
+    <label>Standard-Buy-in (CHF)<input inputmode="decimal" data-g="buyIn" value="${amtIn(g.buyIn)}"></label>
+    <div class="row"><label class="grow">Small Blind (CHF)<input inputmode="decimal" data-g="sb" value="${amtIn(g.sb)}"></label>
+    <label class="grow">Big Blind (CHF)<input inputmode="decimal" data-g="bb" value="${amtIn(g.bb)}"></label></div>
+    <div class="mu">Änderungen werden automatisch gespeichert.</div></div>`;
+  h += `<h3>Chips pro Spieler${ib('chips')}</h3><div class="card"><div class="chrow chhead"><span>Farbe</span><span>Name</span><span>Wert CHF</span><span>Anzahl</span><span></span></div>`;
+  g.chips.forEach((c, i) => {
+    h += `<div class="chrow"><input type="color" data-c="hex" data-i="${i}" value="${esc(c.hex)}"><input type="text" data-c="name" data-i="${i}" value="${esc(c.name)}">
+      <input inputmode="decimal" data-c="value" data-i="${i}" value="${amtIn(c.value)}"><input inputmode="numeric" data-c="count" data-i="${i}" value="${c.count}">
+      <button class="ibtn" data-a="chipDel" data-i="${i}" aria-label="Chip löschen">✕</button></div>`;
+  });
+  h += `<div class="row" style="margin-top:8px"><span class="grow">Summe pro Spieler</span><b data-chipsum class="${sum === g.buyIn ? 'pos' : 'neg'}">${chf(sum)}${sum === g.buyIn ? ' ✓' : ` (Buy-in ${chf(g.buyIn)})`}</b></div>
+    <button class="btn block" data-a="chipAdd">+ Chip hinzufügen</button></div>`;
+  h += `<button class="btn block" data-a="exportCsv">Abende als CSV exportieren (Excel)</button>
     <button class="btn danger block" data-a="delGroup">Gruppe löschen</button>`;
+  return h;
+}
+function updateChipSum(g) {
+  const el = document.querySelector('[data-chipsum]'); if (!el) return;
+  const sum = chipSum(g.chips);
+  el.className = sum === g.buyIn ? 'pos' : 'neg';
+  el.textContent = chf(sum) + (sum === g.buyIn ? ' ✓' : ` (Buy-in ${chf(g.buyIn)})`);
 }
 
+function sessSub(s) {
+  const parts = [];
+  if (s.location) parts.push('📍 ' + esc(s.location));
+  if (s.blinds) parts.push(`Blinds ${NF.format(s.blinds.sb / 100)} / ${NF.format(s.blinds.bb / 100)}`);
+  return parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : '';
+}
 function liveHtml(s) {
   const g = G(s.groupId), st = sessStats(s);
   const act = s.players.filter(p => !p.left), gone = s.players.filter(p => p.left);
   const paid = gone.reduce((a, p) => a + (p.end || 0), 0);
   const pz = (s.pauses || []).find(p => !p.to);
   const buyLbl = g.buyIn % 100 === 0 ? String(g.buyIn / 100) : NF.format(g.buyIn / 100);
-  let h = `<div class="sum" data-host><div><div class="mu">Pot</div><b class="num">${NF.format(st.pot / 100)}</b></div><div><div class="mu">Am Tisch${ib('pot')}</div><b class="num">${NF.format((st.pot - paid) / 100)}</b></div>${s.noTime ? '' : `<div><div class="mu">Dauer</div><b data-dur>${fDur(st.dur)}</b></div>`}<div><div class="mu">Spieler</div><b>${act.length}${gone.length ? `<span class="mu"> +${gone.length}</span>` : ''}</b></div></div>`;
+  let h = sessSub(s) + `<div class="sum" data-host><div><div class="mu">Pot</div><b class="num">${NF.format(st.pot / 100)}</b></div><div><div class="mu">Am Tisch${ib('pot')}</div><b class="num">${NF.format((st.pot - paid) / 100)}</b></div>${s.noTime ? '' : `<div><div class="mu">Dauer</div><b data-dur>${fDur(st.dur)}</b></div>`}<div><div class="mu">Spieler</div><b>${act.length}${gone.length ? `<span class="mu"> +${gone.length}</span>` : ''}</b></div></div>`;
   if (pz) h += `<div class="banner" style="cursor:default"><div class="row"><span class="grow">⏸ <b>Pause</b> seit ${fTime(pz.from)}${ib('pause')}</span><button class="btn pri" data-a="resume">▶ Fortsetzen</button></div></div>`;
   act.forEach(pl => {
     const p = st.map[pl.memberId];
@@ -566,7 +627,7 @@ function logHtml(s, collapsed) {
 function resultHtml(s) {
   const st = sessStats(s);
   const P = st.players.slice().sort((a, b) => (b.net ?? -1e15) - (a.net ?? -1e15));
-  let h = `<div class="tiles"><div class="tile"><span class="mu">Pot</span><b class="num">${chf(st.pot)}</b></div>${st.dur == null ? `<div class="tile"><span class="mu">Spieler</span><b>${st.players.length}</b></div>` : `<div class="tile"><span class="mu">Dauer${st.pause >= 60000 ? ' ohne Pausen' : ''}</span><b>${fDur(st.dur)}</b>${st.pause >= 60000 ? `<span class="mu">Pausen: ${fDur(st.pause)}</span>` : ''}</div>`}</div>`;
+  let h = sessSub(s) + `<div class="tiles"><div class="tile"><span class="mu">Pot</span><b class="num">${chf(st.pot)}</b></div>${st.dur == null ? `<div class="tile"><span class="mu">Spieler</span><b>${st.players.length}</b></div>` : `<div class="tile"><span class="mu">Dauer${st.pause >= 60000 ? ' ohne Pausen' : ''}</span><b>${fDur(st.dur)}</b>${st.pause >= 60000 ? `<span class="mu">Pausen: ${fDur(st.pause)}</span>` : ''}</div>`}</div>`;
   if (s.noTime) h += `<div class="mu" style="margin:0 2px 8px">Nachgetragener Abend${ib('noTime')}</div>`;
   if (st.diff !== 0) h += `<div class="banner err">⚠️ Kontrollsumme stimmt nicht: Endbeträge ${chf(st.endSum)}, Buy-ins ${chf(st.pot)} (Differenz ${sgn(st.diff)}). <u data-a="editEnds">Korrigieren</u></div>`;
   h += `<h3>Resultat</h3><div class="card tw"><table><tr><th>Spieler</th><th>Buy-in</th><th>Ende</th><th>Netto</th><th>ROI</th></tr>`;
@@ -600,7 +661,7 @@ function statsHtml(g, c) {
   const X = groupStats(g, c.until);
   let h = `<label>Statistik bis und mit<select data-f="until">
     <option value="">Alle Abende (${all.length})</option>
-    ${all.map((s, i) => `<option value="${s.start}" ${c.until === s.start ? 'selected' : ''}>${fDate(s.start)}${all.filter(x => fDate(x.start) === fDate(s.start)).length > 1 ? ', ' + fTime(s.start) : ''} (${all.length - i} Abend${all.length - i > 1 ? 'e' : ''})</option>`).join('')}
+    ${all.map((s, i) => `<option value="${s.start}" ${c.until === s.start ? 'selected' : ''}>${fDate(s.start)}${s.location ? ' · ' + esc(s.location) : ''}${all.filter(x => fDate(x.start) === fDate(s.start)).length > 1 ? ', ' + fTime(s.start) : ''} (${all.length - i} Abend${all.length - i > 1 ? 'e' : ''})</option>`).join('')}
   </select></label>`;
   h += `<div class="tiles">${tile('Abende', X.ss.length)}${tile('Ø Dauer', X.durAvg == null ? '–' : fDur(X.durAvg))}${tile('Ø Spieler', (Math.round(X.plAvg * 10) / 10).toLocaleString('de-CH'))}${tile('Ø Pot', chf(X.potAvg))}</div>`;
 
@@ -661,6 +722,7 @@ const HELP = {
   bust: 'Raus = keine Chips mehr. Wer jemanden rauswirft, erhält einen Knockout, egal wer All-in ging. Noch Chips = der Verlierer hatte mehr Chips und bleibt im Spiel. Für die Duell-Statistik zählt jedes gewonnene oder verlorene All-in. «Gegner raus» braucht einen gewählten Gegner.',
   pause: 'Während der Pause steht die Spielzeit still. Dauer, CHF/h, Zeit am Tisch und Zeit bis Rebuy werden ohne Pausen gerechnet. Buy-ins und All-ins können trotzdem erfasst werden.',
   update: 'Neue Versionen erscheinen beim nächsten Öffnen der App. Nach einem Upload auf GitHub kann es einige Minuten dauern, bis GitHub die neue Version ausliefert. «Nach Update suchen» prüft sofort und lädt die neue Version. Die Daten bleiben dabei erhalten.',
+  chips: 'Startchips pro Spieler: Farbe, Wert und Anzahl. Die Summe pro Spieler sollte dem Buy-in entsprechen. Ändert sich ein Wert, werden die Chips nach Wert sortiert. Ein neuer Abend übernimmt die aktuelle Einstellung, spätere Änderungen betreffen ihn nicht.',
   ties: 'Bei Gleichstand erhalten alle Betroffenen den Titel. Ein Titel erscheint nur, wenn die Bedingung erfüllt ist.'
 };
 const ib = k => `<button class="ib" data-a="help" data-k="${k}" aria-label="Info">ⓘ</button>`;
@@ -787,7 +849,7 @@ class PdfDoc {
       let x = L;
       cells.forEach((c, i) => {
         const col = cols[i], cell = c && typeof c === 'object' ? c : { t: c };
-        const right = i > 0;
+        const right = i > 0 && !col.left;
         this.text(right ? x + col.w - 4 : x + 4, this.y, cell.t, { size: 9.5, bold: head || cell.bold, align: right ? 'right' : 'left', color: head ? C_MU : cell.color });
         x += col.w;
       });
@@ -836,6 +898,13 @@ function groupPdfSection(d, g, until) {
    ['Ø Dauer', X.durAvg == null ? '-' : fDur(X.durAvg)], ['Ø Spieler', r1(X.plAvg)], ['Ø Pot', chf(X.potAvg)]]
     .forEach(([k, v]) => { d.text(50, d.y, k, { size: 10, color: C_MU }); d.text(130, d.y, v, { size: 10, bold: true }); d.y -= 15; });
 
+  d.heading('Übersicht der Abende');
+  d.table([{ h: 'Datum', w: 85 }, { h: 'Standort', w: 150, left: true }, { h: 'Spieler', w: 50 }, { h: 'Pot CHF', w: 70 }, { h: 'Haifisch', w: 140, left: true }],
+    X.ss.map(s => {
+      const st = sessStats(s), w = best(st.players.filter(p => p.net > 0), p => p.net, 1);
+      return [{ t: new Date(s.start).toLocaleDateString('de-CH') }, s.location || '-', String(st.players.length), NF.format(st.pot / 100),
+        w.length ? `${w.map(p => mName(p.id)).join(', ')} ${sgn(w[0].net)}` : '-'];
+    }).reverse());
   d.heading('Gesamtbilanz (CHF)');
   const mx = Math.max(1, ...X.arr.map(q => Math.abs(q.total)));
   const mid = 320, half = 130;
@@ -886,9 +955,12 @@ function sessionPdf(s) {
   const nc = v => v > 0 ? C_POS : v < 0 ? C_NEG : C_TX;
   d.cur.push('0.078 0.325 0.176 rg 0 771.89 595.28 70 re f');
   d.text(50, 810, 'Pokerabend ' + new Date(s.start).toLocaleDateString('de-CH', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }), { size: 18, bold: true, color: [1, 1, 1] });
-  d.text(50, 790, g ? g.name : '', { size: 11, color: [0.85, 0.93, 0.88] });
+  d.text(50, 790, (g ? g.name : '') + (s.location ? ' · ' + s.location : ''), { size: 11, color: [0.85, 0.93, 0.88] });
   d.y = 745;
-  const info = [['Pot', chf(st.pot)], ['Spieler', String(st.players.length)]];
+  const info = [];
+  if (s.location) info.push(['Standort', s.location]);
+  info.push(['Pot', chf(st.pot)], ['Spieler', String(st.players.length)]);
+  if (s.blinds) info.push(['Blinds', `${NF.format(s.blinds.sb / 100)} / ${NF.format(s.blinds.bb / 100)}`]);
   if (s.noTime) info.push(['Zeit', 'nachgetragen, ohne Uhrzeiten']);
   else {
     info.push(['Zeit', `${fTime(s.start)} – ${s.end ? fTime(s.end) : 'läuft'}`], ['Dauer', fDur(st.dur) + (st.pause >= 60000 ? ' (ohne Pausen)' : '')]);
@@ -927,6 +999,21 @@ function sessionPdf(s) {
   return d.build(`Pokerrunde · erstellt ${new Date().toLocaleDateString('de-CH')} ${fTime(Date.now())}`);
 }
 
+function nsStep1() {
+  const g = G(M.gid), ns = M.ns;
+  const ids = g.memberIds.filter(id => !isArch(id));
+  const locs = [...new Set(D.sessions.filter(s => s.groupId === g.id && s.location).sort((a, b) => b.start - a.start).map(s => s.location))];
+  modal(`<h2>Neuer Abend</h2>
+    <label class="chk"><input type="checkbox" data-f="nsPast" data-a="nsPast" ${ns.past ? 'checked' : ''}> Vergangenen Abend nachtragen (ohne Uhrzeiten)</label>
+    <label data-w="now" class="${ns.past ? 'hidden' : ''}">Start<input type="datetime-local" data-f="nsStart" value="${esc(ns.start)}"></label>
+    <label data-w="past" class="${ns.past ? '' : 'hidden'}">Datum<input type="date" data-f="nsDate" value="${esc(ns.date)}"></label>
+    <label>Standort (optional)<input type="text" data-f="nsLoc" list="locList" value="${esc(ns.loc)}" placeholder="z. B. bei Anna" autocomplete="off"></label>
+    <datalist id="locList">${locs.map(l => `<option value="${esc(l)}">`).join('')}</datalist>
+    <div class="lbl">Teilnehmer</div>${chipsHtml(ids, M.sel, 'chip')}
+    <label class="chk"><input type="checkbox" data-f="nsBuy" ${ns.buy ? 'checked' : ''}> Allen den ersten Buy-in (${chf(g.buyIn)}) buchen</label>
+    <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="nsNext">Weiter</button></div>`);
+}
+
 /* ---------- Aktionen ---------- */
 function addBuy(s, memberId, amount, t) {
   const e = { id: uid(), t: t || Date.now(), type: 'buyin', memberId, amount };
@@ -957,7 +1044,8 @@ const A = {
   hmenu() {
     const s = S(cur().id); if (!s) return;
     modal(`<h2>Abend ${fDate(s.start)}</h2>
-      <button class="btn block" data-a="editTimes">${s.noTime ? 'Datum ändern' : 'Start-/Endzeit ändern'}</button>
+      <button class="btn block" data-a="editTimes">${s.noTime ? 'Datum & Standort ändern' : 'Zeiten & Standort ändern'}</button>
+      <button class="btn block" data-a="showChips">Chipaufteilung anzeigen</button>
       ${s.status === 'closed' ? '<button class="btn block" data-a="exportPdf">Als PDF exportieren</button>' : ''}
       ${s.status === 'open' ? '<button class="btn block" data-a="addPlayers">Spieler stösst dazu</button>' : '<button class="btn block" data-a="editEnds">Endbeträge bearbeiten</button><button class="btn block" data-a="reopen">Wieder öffnen</button>'}
       <button class="btn danger block" data-a="delSession">Abend löschen</button>
@@ -971,7 +1059,7 @@ const A = {
 
   newGroup() {
     askText('Neue Gruppe', '', name => {
-      const g = { id: uid(), name, memberIds: [], buyIn: 2000 };
+      const g = groupDefaults({ id: uid(), name, memberIds: [], buyIn: 2000 });
       D.groups.push(g); save();
       go({ v: 'group', id: g.id, sub: 'members' });
     });
@@ -990,13 +1078,17 @@ const A = {
       D.members.push(m); G(cur().id).memberIds.push(m.id); save(); render();
     });
   },
-  gSave() {
-    const g = G(cur().id);
-    const name = document.querySelector('[data-f=gName]').value.trim();
-    const b = parseAmt(document.querySelector('[data-f=gBuy]').value);
-    if (!name) return toast('Name fehlt.');
-    if (b == null || isNaN(b) || b <= 0) return toast('Ungültiger Buy-in-Betrag.');
-    g.name = name; g.buyIn = b; save(); render(); toast('Gespeichert');
+  chipAdd() {
+    const g = groupDefaults(G(cur().id));
+    const top = g.chips.length ? g.chips[g.chips.length - 1].value : 50;
+    g.chips.push({ name: 'Neu', hex: '#9333ea', value: top * 2, count: 0 });
+    g.chips.sort((a, b) => a.value - b.value);
+    save(); render();
+  },
+  chipDel(el) {
+    const g = groupDefaults(G(cur().id)), c = g.chips[Number(el.dataset.i)];
+    if (!c || !confirm(`Chip «${c.name}» löschen?`)) return;
+    g.chips = g.chips.filter(x => x !== c); save(); render();
   },
   delGroup() {
     const g = G(cur().id);
@@ -1011,28 +1103,34 @@ const A = {
     const g = G(cur().id);
     const ss = D.sessions.filter(s => s.groupId === g.id && s.status === 'closed').sort((a, b) => a.start - b.start);
     if (!ss.length) return toast('Keine abgeschlossenen Abende.');
-    const rows = [['Datum', 'Spieler', 'Buy-ins', 'Rebuys', 'Buy-in Total CHF', 'Endbetrag CHF', 'Netto CHF', 'All-ins', 'All-ins gewonnen', 'Dauer h']];
+    const rows = [['Datum', 'Standort', 'Spieler', 'Buy-ins', 'Rebuys', 'Buy-in Total CHF', 'Endbetrag CHF', 'Netto CHF', 'All-ins', 'All-ins gewonnen', 'Dauer h']];
     ss.forEach(s => {
       const st = sessStats(s);
-      st.players.forEach(p => rows.push([new Date(s.start).toLocaleDateString('de-CH'), mName(p.id), p.buys.length, p.rebuys, (p.buy / 100).toFixed(2), p.end == null ? '' : (p.end / 100).toFixed(2), p.net == null ? '' : (p.net / 100).toFixed(2), p.allins, p.allinWins, (st.dur / 3600000).toFixed(2)]));
+      st.players.forEach(p => rows.push([new Date(s.start).toLocaleDateString('de-CH'), s.location || '', mName(p.id), p.buys.length, p.rebuys, (p.buy / 100).toFixed(2), p.end == null ? '' : (p.end / 100).toFixed(2), p.net == null ? '' : (p.net / 100).toFixed(2), p.allins, p.allinWins, (st.dur / 3600000).toFixed(2)]));
     });
     const csv = '﻿' + rows.map(r => r.map(csvCell).join(';')).join('\r\n');
     shareOrDownload(csv, `pokerrunde-${g.name.replace(/[^\wäöüÄÖÜ-]+/g, '_')}-${today()}.csv`, 'text/csv');
   },
 
   newSession() {
-    const g = G(cur().id);
+    const g = groupDefaults(G(cur().id));
     const ids = g.memberIds.filter(id => !isArch(id));
     if (ids.length < 2) { toast('Mindestens 2 Mitglieder in der Gruppe nötig.'); cur().sub = 'members'; return render(); }
-    M = { sel: new Set(ids), gid: g.id };
-    modal(`<h2>Neuer Abend</h2>
-      <label class="chk"><input type="checkbox" data-f="nsPast" data-a="nsPast"> Vergangenen Abend nachtragen (ohne Uhrzeiten)</label>
-      <label data-w="now">Start<input type="datetime-local" data-f="nsStart" value="${dtLocal(Date.now())}"></label>
-      <label data-w="past" class="hidden">Datum<input type="date" data-f="nsDate" value="${today()}"></label>
-      <div class="lbl">Teilnehmer</div>${chipsHtml(ids, M.sel, 'chip')}
-      <label class="chk"><input type="checkbox" data-f="nsBuy" checked> Allen den ersten Buy-in (${chf(g.buyIn)}) buchen</label>
-      <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="createSession">Starten</button></div>`);
+    M = { sel: new Set(ids), gid: g.id, ns: { past: false, start: dtLocal(Date.now()), date: today(), loc: '', buy: true } };
+    nsStep1();
   },
+  nsNext() {
+    if (M.sel.size < 2) return toast('Mindestens 2 Teilnehmer wählen.');
+    const q = f => $('sheet').querySelector(`[data-f=${f}]`);
+    const ns = { past: q('nsPast').checked, start: q('nsStart').value, date: q('nsDate').value, loc: q('nsLoc').value.trim(), buy: q('nsBuy').checked };
+    if (ns.past ? !ns.date || isNaN(new Date(ns.date + 'T20:00').getTime()) : (ns.start && isNaN(new Date(ns.start).getTime()))) return toast(ns.past ? 'Bitte Datum wählen.' : 'Ungültige Startzeit.');
+    M.ns = ns;
+    const g = G(M.gid);
+    modal(`<h2>Chipaufteilung</h2><div class="sub">${M.sel.size} Spieler · Blinds ${NF.format(g.sb / 100)} / ${NF.format(g.bb / 100)}${ns.loc ? ' · ' + esc(ns.loc) : ''}</div>
+      ${g.chips.length ? chipTable(g.chips, M.sel.size, g.buyIn) : '<div class="mu">Keine Chips definiert (Gruppe → Einstell.).</div>'}
+      <div class="mbtns"><button class="btn" data-a="nsBack">Zurück</button><button class="btn pri" data-a="createSession">Starten</button></div>`);
+  },
+  nsBack() { nsStep1(); },
   nsPast(el) {
     $('sheet').querySelector('[data-w=now]').classList.toggle('hidden', el.checked);
     $('sheet').querySelector('[data-w=past]').classList.toggle('hidden', !el.checked);
@@ -1045,21 +1143,14 @@ const A = {
   },
   createSession() {
     if (M.sel.size < 2) return toast('Mindestens 2 Teilnehmer wählen.');
-    const g = G(M.gid);
-    const past = document.querySelector('[data-f=nsPast]').checked;
-    let start;
-    if (past) {
-      const dv = document.querySelector('[data-f=nsDate]').value;
-      start = dv ? new Date(dv + 'T20:00').getTime() : NaN;
-      if (isNaN(start)) return toast('Bitte Datum wählen.');
-    } else {
-      const v = document.querySelector('[data-f=nsStart]').value;
-      start = v ? new Date(v).getTime() : Date.now();
-      if (isNaN(start)) start = Date.now();
-    }
-    const s = { id: uid(), groupId: g.id, start, end: null, status: 'open', players: sortIds([...M.sel]).map(id => ({ memberId: id, end: null })), events: [] };
+    const g = groupDefaults(G(M.gid)), ns = M.ns, past = ns.past;
+    let start = past ? new Date(ns.date + 'T20:00').getTime() : (ns.start ? new Date(ns.start).getTime() : Date.now());
+    if (isNaN(start)) start = Date.now();
+    const s = { id: uid(), groupId: g.id, start, end: null, status: 'open', players: sortIds([...M.sel]).map(id => ({ memberId: id, end: null })), events: [],
+      blinds: { sb: g.sb, bb: g.bb }, chips: g.chips.map(c => ({ ...c })) };
+    if (ns.loc) s.location = ns.loc;
     if (past) s.noTime = true;
-    if (document.querySelector('[data-f=nsBuy]').checked) s.players.forEach(p => addBuy(s, p.memberId, g.buyIn, s.start));
+    if (ns.buy) s.players.forEach(p => addBuy(s, p.memberId, g.buyIn, s.start));
     D.sessions.push(s); save(); closeModal();
     go({ v: 'session', id: s.id });
   },
@@ -1208,20 +1299,31 @@ const A = {
     if (s.end && !s.noTime && Date.now() - s.end >= 60000) (s.pauses || (s.pauses = [])).push({ from: s.end, to: Date.now() });
     s.status = 'open'; s.end = null; save(); closeModal(); render();
   },
+  showChips() {
+    const s = S(cur().id), g = groupDefaults(G(s.groupId));
+    const chips = s.chips || g.chips, n = s.players.filter(p => !p.left).length;
+    const bl = s.blinds || { sb: g.sb, bb: g.bb };
+    modal(`<h2>Chipaufteilung</h2><div class="sub">${n} Spieler am Tisch · Blinds ${NF.format(bl.sb / 100)} / ${NF.format(bl.bb / 100)}</div>
+      ${chips.length ? chipTable(chips, n, g.buyIn) : '<div class="mu">Keine Chips definiert.</div>'}
+      <button class="btn block" data-a="modalClose">Schliessen</button>`);
+  },
   editTimes() {
     const s = S(cur().id);
+    const locF = `<label>Standort (optional)<input type="text" data-f="tLoc" value="${esc(s.location || '')}" autocomplete="off"></label>`;
     if (s.noTime) {
-      modal(`<h2>Datum ändern</h2><label>Datum<input type="date" data-f="tDate" value="${dtLocal(s.start).slice(0, 10)}"></label>
+      modal(`<h2>Datum & Standort</h2><label>Datum<input type="date" data-f="tDate" value="${dtLocal(s.start).slice(0, 10)}"></label>${locF}
         <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="timesSave">Speichern</button></div>`);
       return;
     }
-    modal(`<h2>Zeiten ändern</h2><label>Start<input type="datetime-local" data-f="tStart" value="${dtLocal(s.start)}"></label>
+    modal(`<h2>Zeiten & Standort</h2><label>Start<input type="datetime-local" data-f="tStart" value="${dtLocal(s.start)}"></label>${locF}
       ${s.end ? `<label>Ende<input type="datetime-local" data-f="tEnd" value="${dtLocal(s.end)}"></label>` : ''}
       <div class="mu" style="margin:4px 2px">Was passiert mit den Einträgen?${ib('times')}</div>
       <div class="mbtns"><button class="btn" data-a="modalClose">Abbrechen</button><button class="btn pri" data-a="timesSave">Speichern</button></div>`);
   },
   timesSave() {
     const s = S(cur().id);
+    const lv = document.querySelector('[data-f=tLoc]').value.trim();
+    if (lv) s.location = lv; else delete s.location;
     const all = f => { s.events.forEach(e => e.t = f(e.t)); s.players.forEach(p => { if (p.joined) p.joined = f(p.joined); if (p.left) p.left = f(p.left); }); (s.pauses || []).forEach(p => { p.from = f(p.from); if (p.to) p.to = f(p.to); }); };
     if (s.noTime) {
       const dv = document.querySelector('[data-f=tDate]').value;
@@ -1348,7 +1450,47 @@ document.addEventListener('click', ev => {
 });
 document.addEventListener('input', ev => { if (ev.target.classList.contains('endInp')) updateSettleSum(); });
 document.addEventListener('change', ev => {
-  if (ev.target.dataset.f !== 'until') return;
+  const el = ev.target;
+  if (el.dataset.g || el.dataset.c) {
+    const c = cur(); if (c.v !== 'group') return;
+    const g = groupDefaults(G(c.id));
+    if (el.dataset.g) {
+      const k = el.dataset.g;
+      if (k === 'name') {
+        const v = el.value.trim();
+        if (!v) { toast('Name fehlt.'); el.value = g.name; return; }
+        g.name = v; $('title').textContent = v;
+      } else {
+        const v = parseAmt(el.value);
+        if (v == null || isNaN(v) || v < 0 || (k === 'buyIn' && v === 0)) { toast('Ungültiger Betrag.'); el.value = amtIn(g[k]); return; }
+        g[k] = v; el.value = amtIn(v);
+        if (k === 'sb' && g.bb < v) toast('Hinweis: Small Blind ist grösser als Big Blind.');
+        if (k === 'bb' && v < g.sb) toast('Hinweis: Big Blind ist kleiner als Small Blind.');
+        updateChipSum(g);
+      }
+      save(); return;
+    }
+    const i = Number(el.dataset.i), ch = g.chips[i], k = el.dataset.c;
+    if (!ch) return;
+    if (k === 'name') { ch.name = el.value.trim() || ch.name; el.value = ch.name; }
+    else if (k === 'hex') ch.hex = el.value;
+    else if (k === 'count') {
+      const v = Math.round(Number(el.value.replace(',', '.')));
+      if (!isFinite(v) || v < 0) { toast('Ungültige Anzahl.'); el.value = ch.count; return; }
+      ch.count = v; el.value = v;
+    } else if (k === 'value') {
+      const v = parseAmt(el.value);
+      if (v == null || isNaN(v) || v <= 0) { toast('Ungültiger Wert.'); el.value = amtIn(ch.value); return; }
+      ch.value = v;
+      const before = g.chips.map(x => x);
+      g.chips.sort((a, b) => a.value - b.value);
+      save();
+      if (g.chips.some((x, j) => x !== before[j])) { render(); toast('Chips nach Wert sortiert'); return; }
+      el.value = amtIn(v);
+    }
+    updateChipSum(g); save(); return;
+  }
+  if (el.dataset.f !== 'until') return;
   cur().until = ev.target.value ? Number(ev.target.value) : null;
   render();
 });
@@ -1370,6 +1512,7 @@ if (window.ResizeObserver) { const ro = new ResizeObserver(measure); ro.observe(
 (async function init() {
   try {
     const d = await Storage.get('data'); if (d) D = d;
+    D.groups.forEach(groupDefaults);
     const m = await Storage.get('meta'); if (m) META = m;
   } catch (e) { toast('Speicher nicht verfügbar: ' + e); }
   render();
